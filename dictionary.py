@@ -40,18 +40,3 @@ users = {
     }
 }
 print(users["Yasar Yilmaz"]["roles"][0])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
