@@ -25,23 +25,22 @@
 
 # Demo: 1
 
-s,v,n,m = 21, 22, 24, 25
+h,s,b,m = 21, 22, 24, 25
 piece_of_fruits = 14, 22, 31, 55
 
 
 k = int(input("13. Koğuş: "))
 p = int(input("78. Kirkpinar Yağli Güresleri: "))
-result = (k*p) + (s-v-n-m)
+result = (k*p) + (h-s-b-m)
 
-result = s*n
-toplam = (s+v+n)
+result = h*s
+toplam = (h+s+b)
 result = (toplam%5)
-result = s **n
+result = h **s
 piece_of_fruits = 14,22 , 31, 55
-s, *n, v = piece_of_fruits
-result = s **3
-result = n[0]+n[1]
-
+h, *s, b = piece_of_fruits
+result = h **3
+result = s[0]+s[1]
 
 
 print(result)
