@@ -11,10 +11,11 @@
 
 # reference types => list
 
-x = ["corn","cucumber"]
-y = ["corn","cucumber"]
+s = ["corn","cucumber"]
+c = ["corn","cucumber"]
 
-x = y
+s= c
+s[0] = "melon"
 
-x[0] = "melon"
-print(x, y)
+print(s, c)
+
