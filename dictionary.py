@@ -25,18 +25,19 @@
 
 
 users = {
-    "Yasar Yilmaz": {
+    "Mustafa Yilmaz": {
     "age" : "42",
-    "email adress" : "ysrylmz55@gmail.com",
+    "email adress" : "mustafa4432@gmail.com",
     "phone" : "2829239330",
     "roles" : ["Admin","user"]
     },
 
-    "Filiz Yilmaz" : {
+    "Poyraz Yilmaz" : {
     "age": "43",
-    "email adress" :"flzylmz2855@gmail.com",
+    "email adress" :"poyrazylmz2855@gmail.com",
     "phone" : "2223324",
     "roles" : ["Moderator","user"]
     }
 }
-print(users["Yasar Yilmaz"]["roles"][0])
+
+print(users["Poyraz Yilmaz"]["roles"][0])
