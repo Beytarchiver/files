@@ -12,7 +12,7 @@ result = (a<c)
 result = (a>=b)
 result = (True == 0)
 result = (False == 0)
-result = False + True+55
+result = False + True*40
 
 
 
