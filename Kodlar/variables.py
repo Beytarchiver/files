@@ -5,7 +5,7 @@ print(user1)
 print(user2)
 print(user3)
 name = "Kamillerin İbrahim"
-example = "My Darling"
+example = "My Brother"
 print(name)
 print(example)
 a = 45

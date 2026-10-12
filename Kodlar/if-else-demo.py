@@ -123,7 +123,7 @@ try:
     print("=" * 45)
     print(f"\n📅 Trafik Çıkış Tarihi: {trafik_tarihi.strftime('%d/%m/%Y')}")
     print(f"📅 Bugün: {bugun.strftime('%d/%m/%Y')}")
-    print(f"⏱️  Geçen Süre: {gecen_yil:.1f} yıl")  # .1f ile virgülden sonra 1 basamak gösteriyoruz
+    print(f"⏱️  Geçen Süre: {gecen_yil:.1f} yıl")  
 
     
     if gecen_yil >= 3:
