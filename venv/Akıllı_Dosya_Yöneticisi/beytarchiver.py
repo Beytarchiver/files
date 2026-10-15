@@ -1,20 +1,30 @@
 import ctypes
+import base64
+import gzip
 import hashlib
+import ntpath
 import os
+from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
+import tempfile
 import threading
 import psutil
 import json
 import tarfile
 from datetime import datetime
-from queue import Queue
+from queue import Empty, Queue
+
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 import customtkinter as ctk
 import py7zr
 import pyzipper
-from tkinter import filedialog, ttk, messagebox
+from tkinter import filedialog, ttk, messagebox, simpledialog
 from tkinterdnd2 import DND_FILES, TkinterDnD
 
 # --- Windows Özel Kütüphaneler ---
@@ -87,6 +97,235 @@ def unique_arcname(arc, used):
     used.add(cand)
     return cand
 
+
+class PasswordVault:
+    """Authenticated encrypted storage. The master password is never persisted."""
+
+    AAD = b'beytarchiver-password-vault-v1'
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.lock()
+
+    def lock(self):
+        self._key = None
+        self._salt = None
+        self.data = {}
+
+    @property
+    def unlocked(self):
+        return self._key is not None
+
+    @staticmethod
+    def _derive(password, salt):
+        return Scrypt(salt=salt, length=32, n=2**15, r=8, p=1).derive(password.encode('utf-8'))
+
+    def create(self, password):
+        if self.path.exists():
+            raise FileExistsError('Kasa zaten var; mevcut ana parolayla açın.')
+        if len(password) < 12:
+            raise ValueError('Ana parola en az 12 karakter olmalı.')
+        self._salt = os.urandom(16)
+        self._key = self._derive(password, self._salt)
+        try:
+            self.save({})
+        except Exception:
+            self.lock()
+            raise
+
+    def unlock(self, password):
+        self.lock()
+        try:
+            if self.path.stat().st_size > 16 * 1024 * 1024:
+                raise ValueError('Kasa dosyası çok büyük.')
+            document = json.loads(self.path.read_text(encoding='utf-8'))
+            if document['version'] != 1:
+                raise ValueError('Desteklenmeyen kasa sürümü.')
+            salt = base64.b64decode(document['salt'], validate=True)
+            nonce = base64.b64decode(document['nonce'], validate=True)
+            if len(salt) != 16 or len(nonce) != 12:
+                raise ValueError('Geçersiz kasa biçimi.')
+            key = self._derive(password, salt)
+            payload = AESGCM(key).decrypt(
+                nonce, base64.b64decode(document['ciphertext'], validate=True), self.AAD)
+            data = json.loads(payload)
+            self._validate(data)
+        except (InvalidTag, ValueError, KeyError, TypeError) as exc:
+            raise ValueError('Ana parola yanlış veya kasa dosyası bozuk.') from exc
+        self._key, self._salt, self.data = key, salt, data
+
+    @staticmethod
+    def _validate(data):
+        if not isinstance(data, dict) or not all(
+                isinstance(k, str) and isinstance(v, str) for k, v in data.items()):
+            raise ValueError('Geçersiz şifre kayıtları.')
+
+    def save(self, data):
+        if not self.unlocked:
+            raise ValueError('Önce kasanın kilidini açın.')
+        self._validate(data)
+        nonce = os.urandom(12)
+        payload = json.dumps(data, ensure_ascii=False).encode('utf-8')
+        ciphertext = AESGCM(self._key).encrypt(nonce, payload, self.AAD)
+        document = {'version': 1, 'salt': base64.b64encode(self._salt).decode('ascii'),
+                    'nonce': base64.b64encode(nonce).decode('ascii'),
+                    'ciphertext': base64.b64encode(ciphertext).decode('ascii')}
+        # mkstemp uses restrictive permissions; replace only after a complete write.
+        fd, name = tempfile.mkstemp(prefix='.beyt-vault-', dir=self.path.parent)
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+                json.dump(document, stream)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(name, self.path)
+        finally:
+            if os.path.exists(name):
+                os.unlink(name)
+        self.data = dict(data)
+
+
+def safe_extract_archive(archive_path, output_dir, password='', *,
+                         max_total_size=2 * 1024**3, max_files=10000):
+    """Extract only regular files/directories into a new destination, or leave none."""
+    archive_path, output_dir = Path(archive_path), Path(output_dir)
+    if os.path.lexists(output_dir):
+        raise FileExistsError('Hedef zaten var; farklı veya boşta bir hedef seçin.')
+    if max_total_size < 0 or max_files < 1:
+        raise ValueError('Geçersiz çıkartma sınırları.')
+    reserved = {'CON', 'PRN', 'AUX', 'NUL', 'CONIN$', 'CONOUT$'}
+    reserved.update(f'{prefix}{i}' for prefix in ('COM', 'LPT') for i in range(1, 10))
+    seen, count, declared, actual = {}, 0, 0, 0
+
+    with tempfile.TemporaryDirectory(prefix='.beyt-extract-', dir=output_dir.parent) as temp:
+        stage = Path(temp) / 'content'
+        stage.mkdir()
+
+        def target(name, size, is_dir):
+            nonlocal count, declared
+            count += 1
+            declared += size
+            if count > max_files or size < 0 or declared > max_total_size:
+                raise ValueError('Arşiv dosya sayısı veya açılmış boyut sınırını aşıyor.')
+            normalized = name.replace('\\', '/')
+            parts = normalized.split('/')
+            if (not normalized or normalized.startswith('/') or ntpath.splitdrive(name)[0]
+                    or '..' in parts or any(ord(c) < 32 for c in name)):
+                raise ValueError(f'Güvensiz arşiv yolu: {name!r}')
+            parts = [part for part in parts if part not in ('', '.')]
+            for part in parts:
+                if (part.endswith((' ', '.')) or any(c in part for c in ':<>"|?*')
+                        or part.split('.')[0].upper() in reserved):
+                    raise ValueError(f'Güvensiz dosya adı: {name!r}')
+            if not parts:
+                if is_dir:
+                    return stage
+                raise ValueError('Boş dosya adı.')
+            key = '/'.join(parts).casefold()
+            if key in seen:
+                raise ValueError(f'Çakışan arşiv yolu: {name!r}')
+            for i in range(1, len(parts)):
+                if seen.get('/'.join(parts[:i]).casefold()) is False:
+                    raise ValueError('Dosya ve klasör yolları çakışıyor.')
+            if not is_dir and any(k.startswith(key + '/') for k in seen):
+                raise ValueError('Dosya ve klasör yolları çakışıyor.')
+            seen[key] = is_dir
+            return stage.joinpath(*parts)
+
+        def copy_stream(source, destination):
+            nonlocal actual
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with destination.open('xb') as sink:
+                while True:
+                    chunk = source.read(min(1024 * 1024, max_total_size - actual + 1))
+                    if not chunk:
+                        break
+                    actual += len(chunk)
+                    if actual > max_total_size:
+                        raise ValueError('Açılmış veri boyut sınırını aşıyor.')
+                    sink.write(chunk)
+
+        ext = archive_path.suffix.lower()
+        if ext in ('.zip', '.beyt'):
+            with pyzipper.AESZipFile(archive_path, 'r') as archive:
+                if password:
+                    archive.setpassword(password.encode('utf-8'))
+                entries = []
+                for info in archive.infolist():
+                    kind = stat.S_IFMT(info.external_attr >> 16)
+                    if kind not in (0, stat.S_IFREG, stat.S_IFDIR):
+                        raise ValueError('Arşivde bağlantı veya özel dosya var.')
+                    entries.append((info, target(info.filename, info.file_size, info.is_dir())))
+                for info, dest in entries:
+                    if info.is_dir():
+                        dest.mkdir(parents=True, exist_ok=True)
+                    else:
+                        with archive.open(info) as source:
+                            copy_stream(source, dest)
+        elif ext == '.7z':
+            # py7zr >= 1.1.4 enforces the size limit during decompression too.
+            with py7zr.SevenZipFile(archive_path, 'r', password=password or None,
+                                   max_extract_size=max_total_size) as archive:
+                for info in archive.list():
+                    if info.is_symlink or not (info.is_file or info.is_directory):
+                        raise ValueError('Arşivde bağlantı veya özel dosya var.')
+                    target(info.filename, info.uncompressed, info.is_directory)
+                archive.extractall(path=stage)
+        elif ext in ('.tar', '.gz', '.tgz'):
+            # A .gz file can hold a tar archive or a single compressed stream.
+            try:
+                archive = tarfile.open(archive_path, 'r:*')
+            except tarfile.ReadError:
+                if ext != '.gz':
+                    raise
+                dest = target(archive_path.stem, 0, False)
+                with gzip.open(archive_path, 'rb') as source:
+                    copy_stream(source, dest)
+            else:
+                with archive:
+                    entries = []
+                    for info in archive:
+                        if not (info.isfile() or info.isdir()):
+                            raise ValueError('Arşivde bağlantı veya özel dosya var.')
+                        entries.append((info, target(info.name, info.size, info.isdir())))
+                    for info, dest in entries:
+                        if info.isdir():
+                            dest.mkdir(parents=True, exist_ok=True)
+                        else:
+                            with archive.extractfile(info) as source:
+                                copy_stream(source, dest)
+        else:
+            raise ValueError('Desteklenmeyen arşiv biçimi.')
+        if os.path.lexists(output_dir):
+            raise FileExistsError('Hedef işlem sırasında oluşturuldu; üzerine yazılmadı.')
+        stage.rename(output_dir)
+    return output_dir
+
+
+def overwrite_and_delete(path):
+    """Best-effort file overwrite, not a guarantee of SSD/backup erasure."""
+    path = Path(path)
+    initial = path.lstat()
+    if not stat.S_ISREG(initial.st_mode) or initial.st_nlink != 1:
+        raise ValueError('Yalnızca bağlantısız, normal dosyalar silinebilir.')
+    fd = os.open(path, os.O_RDWR | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_BINARY', 0))
+    with os.fdopen(fd, 'r+b') as stream:
+        current = os.fstat(stream.fileno())
+        if (current.st_dev, current.st_ino) != (initial.st_dev, initial.st_ino) or current.st_nlink != 1:
+            raise ValueError('Dosya değişti; işlem iptal edildi.')
+        for pattern in (b'\x00', b'\xff', None):
+            stream.seek(0)
+            remaining = initial.st_size
+            while remaining:
+                length = min(1024 * 1024, remaining)
+                stream.write(pattern * length if pattern else os.urandom(length))
+                remaining -= length
+            stream.flush()
+            os.fsync(stream.fileno())
+    current = path.lstat()
+    if (current.st_dev, current.st_ino) != (initial.st_dev, initial.st_ino):
+        raise ValueError('Dosya yolu değişti; silme iptal edildi.')
+    path.unlink()
+
 # --- Zengin Renk Paletleri ---
 COLOR_THEMES = {
     "Catppuccin (Varsayılan)": {
@@ -151,7 +390,7 @@ LANGUAGES = {
         "av_title": "🛡️ Beytarchiver Güvenlik Motoru v3.7 Ultimate", "av_sub": "Kurumsal İmza & Sezgisel Derin Analiz",
         "av_select": "🔍 Taranacak Dosya Seç", "no_file": "Dosya Seçilmedi",
         "update_title": "🚀 Beytarchiver v3.7 Pro Ultimate Raporu",
-        "update_notes": "📌 SÜRÜM GELİŞİM GEÇMİŞİ:\n\n✨ v3.7 (Ultimate Edition):\n• 📈 CANLI İZLEYİCİ: CPU ve RAM kullanımı anlık takibi eklendi.\n• 🔑 ŞİFRE YÖNETİCİSİ: AES-256 şifreli dijital kasa entegrasyonu.\n• 🛠️ AV OPTİMİZASYONU: False-Positive (Yanlış Alarm) uyarıları azaltıldı.\n• 🧹 REGISTRY CLEANER: Kayıt defteri optimizasyonu sağlandı.\n• 🛡️ DoD Shredder: 3 aşamalı askeri standartta güvenli imha.\n• 🛠️ UI Stability: UI Queue (Kuyruk) mimarisi ile Thread-Safe yapıldı.",
+        "update_notes": "📌 SÜRÜM GELİŞİM GEÇMİŞİ:\n\n✨ v3.7 (Ultimate Edition):\n• 📈 CANLI İZLEYİCİ: CPU ve RAM kullanımı anlık takibi eklendi.\n• 🔑 ŞİFRE YÖNETİCİSİ: Ana parolalı AES-256-GCM kasa ve otomatik kilitleme.\n• 🛠️ AV OPTİMİZASYONU: False-Positive (Yanlış Alarm) uyarıları azaltıldı.\n• 🧹 REGISTRY CLEANER: Kayıt defteri optimizasyonu sağlandı.\n• 🛡️ Dosya Silme: Onaylı, parçalı üç geçişli üzerine yazma; SSD silme garantisi yoktur.\n• 🛠️ UI Stability: UI Queue (Kuyruk) mimarisi ile Thread-Safe yapıldı.",
         "btn_close_update": "Harika, Başlayalım! 🚀"
     },
     "EN": {
@@ -169,7 +408,7 @@ LANGUAGES = {
         "av_title": "🛡️ Beytarchiver Security Engine v3.7 Ultimate", "av_sub": "Enterprise Signature & Heuristic Analysis",
         "av_select": "🔍 Select File to Scan", "no_file": "No File Selected",
         "update_title": "🚀 Beytarchiver v3.7 Pro Ultimate Changelog",
-        "update_notes": "📌 VERSION CHANGELOG:\n\n✨ v3.7 (Ultimate Edition):\n• 📈 LIVE MONITOR: Real-time CPU and RAM tracking.\n• 🔑 PASSWORD MANAGER: AES-256 encrypted digital vault.\n• 🛠️ AV OPTIMIZATION: Reduced false-positive warnings.\n• 🧹 REGISTRY CLEANER: Added registry optimization module.\n• 🛡️ DoD Shredder: 3-pass military grade destruction.\n• 🛠️ UI Stability: Full Thread-Safe UI Queue implemented.",
+        "update_notes": "📌 VERSION CHANGELOG:\n\n✨ v3.7 (Ultimate Edition):\n• 📈 LIVE MONITOR: Real-time CPU and RAM tracking.\n• 🔑 PASSWORD MANAGER: Master-password protected AES-256-GCM vault and automatic locking.\n• 🛠️ AV OPTIMIZATION: Reduced false-positive warnings.\n• 🧹 REGISTRY CLEANER: Added registry optimization module.\n• 🛡️ File Removal: Confirmed, chunked three-pass overwrite; no SSD erasure guarantee.\n• 🛠️ UI Stability: Full Thread-Safe UI Queue implemented.",
         "btn_close_update": "Awesome, Let's Go! 🚀"
     }
 }
@@ -178,8 +417,8 @@ LANGUAGES = {
 class BeytNativeAntivirus:
     def __init__(self):
         self.malware_signatures = {
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": "Test.Malware.DummyHash",
-            "44d88612fea8a8f36de82e1278abb02f": "Trojan.Generic.Sample"
+            # EICAR is a harmless antivirus test file, not a real malware database.
+            "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f": "EICAR.Test.File"
         }
         self.high_risk_extensions = [".exe", ".vbs", ".bat", ".cmd", ".ps1", ".scr", ".pif", ".hta"]
 
@@ -197,14 +436,16 @@ class BeytNativeAntivirus:
         filename = os.path.basename(file_path)
         ext = os.path.splitext(filename)[1].lower()
 
-        if filename.count(".") > 1:
+        if filename.count(".") > 1 and ext in self.high_risk_extensions:
             results.append(f"⚠️ SEZGİSEL UYARI: Gizlenmiş çift uzantılı dosya! ({filename})")
         if ext in self.high_risk_extensions:
             results.append(f"ℹ️ SEZGİSEL BİLGİ: Potansiyel betik/uygulama ({ext})")
 
         file_hash = self.calculate_file_hash(file_path)
+        if file_hash is None:
+            results.append("❌ Dosya okunamadı; tarama tamamlanamadı.")
         if file_hash and file_hash in self.malware_signatures:
-            results.append(f"🚨 ZARARLI YAZILIM BULUNDU: {self.malware_signatures[file_hash]}")
+            results.append(f"⚠️ TEST İMZASI BULUNDU: {self.malware_signatures[file_hash]}")
 
         return results, file_hash
 
@@ -230,13 +471,22 @@ class BeytarchiverV37App(TkinterDnD.Tk):
 
         # Thread-Safe UI Queue (Parametre çökmelerini kesin engelleyen yapı)
         self.ui_queue = Queue()
+        self._closing = False
+        self._queue_after = None
+        self._password_after = None
+        self._reveal_after = None
+        self._password_sites = {}
+        self.protocol('WM_DELETE_WINDOW', self.close_app)
         self.process_ui_queue()
 
         self.files_to_archive = []
         self.archive_to_extract = ""
         self.junk_files = []
-        self.passwords_data = {}
-        self.pass_file = os.path.expanduser("~/.beyt_passwords.json")
+        self.password_vault = PasswordVault(Path.home() / '.beyt_passwords.enc')
+        self.legacy_pass_file = Path.home() / '.beyt_passwords.json'
+        self._extracting = False
+        self._compressing = False
+        self._cleaning = False
 
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -270,13 +520,36 @@ class BeytarchiverV37App(TkinterDnD.Tk):
     # KUSURSUZ THREAD-SAFE QUEUE (Çökmeleri Engelleyen Kısım)
     # ==========================================
     def process_ui_queue(self):
-        while not self.ui_queue.empty():
-            func, args, kwargs = self.ui_queue.get()
-            func(*args, **kwargs)
-        self.after(100, self.process_ui_queue)
+        if self._closing:
+            return
+        # Limit each batch so a large scan cannot starve Tk's event loop.
+        for _ in range(100):
+            try:
+                func, args, kwargs = self.ui_queue.get_nowait()
+            except Empty:
+                break
+            try:
+                func(*args, **kwargs)
+            except Exception:
+                self.report_callback_exception(*sys.exc_info())
+        self._queue_after = self.after(100, self.process_ui_queue)
 
     def safe_ui_update(self, func, *args, **kwargs):
-        self.ui_queue.put((func, args, kwargs))
+        if not self._closing:
+            self.ui_queue.put((func, args, kwargs))
+
+    @staticmethod
+    def clear_tree(tree):
+        for item in tree.get_children():
+            tree.delete(item)
+
+    def close_app(self):
+        self._closing = True
+        self.monitor_running = False
+        self.lock_passwords()
+        if self._queue_after is not None:
+            self.after_cancel(self._queue_after)
+        self.destroy()
 
     def t(self, key):
         return LANGUAGES.get(self.current_lang, {}).get(key, key)
@@ -401,6 +674,8 @@ class BeytarchiverV37App(TkinterDnD.Tk):
             self.nav_btns[key] = btn
 
     def show_view(self, view_name):
+        if view_name != 'passwords':
+            self.lock_passwords()
         panels = [
             self.compress_panel, self.extract_panel, self.vault_panel, self.ram_panel, self.updater_panel,
             self.antivirus_panel, self.cleaner_panel, self.analyzer_panel, self.duplicates_panel,
@@ -412,7 +687,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
 
         if view_name in self.nav_btns: self.nav_btns[view_name].configure(fg_color="#313244")
 
-        target = getattr(self, f"{view_name}_panel")
+        target = getattr(self, 'password_panel' if view_name == 'passwords' else f"{view_name}_panel")
         target.pack(fill="both", expand=True)
 
         if view_name == "startup": self.load_startup_apps()
@@ -496,38 +771,143 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.ent_site = ctk.CTkEntry(input_frame, placeholder_text="Site / Uygulama", width=200)
         self.ent_site.pack(side="left", padx=5)
         self.ent_pass = ctk.CTkEntry(input_frame, placeholder_text="Şifre", width=200)
+        self.ent_pass.configure(show='*')
         self.ent_pass.pack(side="left", padx=5)
+        self.ent_site.bind('<KeyPress>', lambda event: self.password_activity())
+        self.ent_pass.bind('<KeyPress>', lambda event: self.password_activity())
         ctk.CTkButton(input_frame, text="Kaydet", command=self.save_password, width=100, fg_color="#89B4FA", text_color="#11111B").pack(side="left", padx=5)
 
         self.pass_tree = ttk.Treeview(body, columns=("site", "pass"), show="headings")
         self.pass_tree.heading("site", text="Site"); self.pass_tree.heading("pass", text="Şifre")
         self.pass_tree.pack(fill="both", expand=True, pady=10)
+        self.pass_tree.bind('<<TreeviewSelect>>', lambda event: self.password_activity())
+        self.lbl_password_status = ctk.CTkLabel(body, text='Kasa kilitli')
+        self.lbl_password_status.pack(pady=5)
+        ctk.CTkButton(body, text='Kasa Oluştur / Kilidi Aç', command=self.unlock_passwords).pack(pady=5)
+        ctk.CTkButton(body, text='Kilitle', command=self.lock_passwords).pack(pady=5)
+        ctk.CTkButton(body, text='Seçili Şifreyi 15 Saniye Göster', command=self.reveal_password).pack(pady=5)
+        ctk.CTkButton(body, text='Eski JSON Kayıtlarını İçe Aktar', command=self.import_legacy_passwords).pack(pady=5)
         ctk.CTkButton(body, text="Seçiliyi Sil", fg_color="#F38BA8", command=self.delete_password).pack(pady=5)
-        self.load_passwords()
+
+    def unlock_passwords(self):
+        password = simpledialog.askstring('Şifre Kasası', 'Ana parola (yeni kasa: en az 12 karakter):',
+                                          show='*', parent=self)
+        if password is None:
+            return
+        try:
+            if self.password_vault.path.exists():
+                self.password_vault.unlock(password)
+            else:
+                confirm = simpledialog.askstring('Yeni Kasa', 'Ana parolayı tekrar girin:', show='*', parent=self)
+                if password != confirm:
+                    raise ValueError('Ana parolalar eşleşmiyor.')
+                self.password_vault.create(password)
+            self.refresh_passwords()
+            self.password_activity()
+            self.lbl_password_status.configure(text='Kasa açık; sekmeden ayrılınca veya 5 dakika sonra kilitlenir.')
+        except (OSError, ValueError) as exc:
+            self.lock_passwords()
+            messagebox.showerror('Kasa açılamadı', str(exc), parent=self)
+
+    def password_activity(self):
+        if self.password_vault.unlocked:
+            if self._password_after is not None:
+                self.after_cancel(self._password_after)
+            self._password_after = self.after(5 * 60 * 1000, self.lock_passwords)
+
+    def lock_passwords(self):
+        if self._password_after is not None:
+            self.after_cancel(self._password_after)
+            self._password_after = None
+        if self._reveal_after is not None:
+            self.after_cancel(self._reveal_after)
+            self._reveal_after = None
+        self.password_vault.lock()
+        self._password_sites.clear()
+        self.clear_tree(self.pass_tree)
+        self.ent_site.delete(0, 'end')
+        self.ent_pass.delete(0, 'end')
+        self.lbl_password_status.configure(text='Kasa kilitli')
+
+    def refresh_passwords(self):
+        self.clear_tree(self.pass_tree)
+        self._password_sites.clear()
+        for site in sorted(self.password_vault.data):
+            row = self.pass_tree.insert('', 'end', values=(site, '••••••••'))
+            # Treeview coerces numeric-looking values (e.g. '00123') to ints.
+            # Row identity, rather than display values, must identify the record.
+            self._password_sites[row] = site
+
+    def reveal_password(self):
+        selected = self.pass_tree.selection()
+        if selected and self.password_vault.unlocked:
+            item = selected[0]
+            site = self._password_sites[item]
+            self.pass_tree.item(item, values=(site, self.password_vault.data[site]))
+            if self._reveal_after is not None:
+                self.after_cancel(self._reveal_after)
+            self._reveal_after = self.after(15000, self.hide_revealed_passwords)
+            self.password_activity()
+
+    def hide_revealed_passwords(self):
+        self._reveal_after = None
+        self.refresh_passwords()
+
+    def import_legacy_passwords(self):
+        if not self.password_vault.unlocked:
+            messagebox.showinfo('Kasa kilitli', 'Önce kasanın kilidini açın.', parent=self)
+            return
+        if not self.legacy_pass_file.exists():
+            messagebox.showinfo('İçe aktar', 'Eski JSON dosyası bulunamadı.', parent=self)
+            return
+        if not messagebox.askyesno('Eski kayıtlar',
+                'Açık metin JSON kayıtları şifreli kasaya alınacak. Mevcut kasa kayıtları korunur. '
+                'Eski dosya silinmez ve açık metin kalır; işlemden sonra ayrıca kaldırmalısınız. Devam edilsin mi?',
+                parent=self):
+            return
+        try:
+            if self.legacy_pass_file.stat().st_size > 16 * 1024 * 1024:
+                raise ValueError('Eski kayıt dosyası çok büyük.')
+            data = json.loads(self.legacy_pass_file.read_text(encoding='utf-8'))
+            PasswordVault._validate(data)
+            self.password_vault.save({**data, **self.password_vault.data})
+            self.refresh_passwords()
+            self.password_activity()
+            messagebox.showinfo('İçe aktarıldı', 'Şifreli kayıt tamamlandı. Eski açık metin JSON dosyası korunmuştur.',
+                                parent=self)
+        except (OSError, ValueError) as exc:
+            messagebox.showerror('İçe aktarılamadı', str(exc), parent=self)
 
     def save_password(self):
-        site, pwd = self.ent_site.get().strip(), self.ent_pass.get().strip()
-        if site and pwd:
-            self.passwords_data[site] = pwd
-            with open(self.pass_file, "w") as f: json.dump(self.passwords_data, f)
-            self.pass_tree.insert("", "end", values=(site, pwd))
-            self.ent_site.delete(0, "end"); self.ent_pass.delete(0, "end")
+        if not self.password_vault.unlocked:
+            messagebox.showinfo('Kasa kilitli', 'Önce kasanın kilidini açın.', parent=self)
+            return
+        site, pwd = self.ent_site.get().strip(), self.ent_pass.get()
+        if not site or not pwd:
+            return
+        try:
+            self.password_vault.save({**self.password_vault.data, site: pwd})
+            self.refresh_passwords()
+            self.password_activity()
+            self.ent_site.delete(0, 'end')
+            self.ent_pass.delete(0, 'end')
+        except (OSError, ValueError) as exc:
+            messagebox.showerror('Kaydedilemedi', str(exc), parent=self)
 
     def delete_password(self):
+        if not self.password_vault.unlocked:
+            return
         selected = self.pass_tree.selection()
         if selected:
-            item = self.pass_tree.item(selected[0])
-            site = item['values'][0]
-            if site in self.passwords_data: del self.passwords_data[site]
-            with open(self.pass_file, "w") as f: json.dump(self.passwords_data, f)
-            self.pass_tree.delete(selected[0])
-
-    def load_passwords(self):
-        if os.path.exists(self.pass_file):
+            site = self._password_sites[selected[0]]
+            data = dict(self.password_vault.data)
+            data.pop(site, None)
             try:
-                with open(self.pass_file, "r") as f: self.passwords_data = json.load(f)
-                for s, p in self.passwords_data.items(): self.pass_tree.insert("", "end", values=(s, p))
-            except: pass
+                self.password_vault.save(data)
+                self.refresh_passwords()
+                self.password_activity()
+            except (OSError, ValueError) as exc:
+                messagebox.showerror('Silinemedi', str(exc), parent=self)
 
     # ==========================================
     # 🛠️ DİĞER MODÜLLER
@@ -583,21 +963,25 @@ class BeytarchiverV37App(TkinterDnD.Tk):
             self.tree.insert("", "end", values=(os.path.basename(path), size, ftype, path))
 
     def start_compression(self):
+        if self._compressing:
+            return
         if not self.files_to_archive:
             self.safe_ui_update(self.lbl_status.configure, text="Lütfen önce dosya ekleyin!", text_color="#F38BA8")
             return
-        threading.Thread(target=self.compress_engine, daemon=True).start()
+        files = tuple(self.files_to_archive)
+        fmt, pwd = self.combo_fmt.get().lower(), self.entry_pass.get()
+        self._compressing = True
+        self.btn_start.configure(state='disabled')
+        threading.Thread(target=self.compress_engine, args=(files, fmt, pwd), daemon=True).start()
 
-    def compress_engine(self):
+    def compress_engine(self, files, fmt, pwd):
         self.safe_ui_update(self.lbl_status.configure, text="Sıkıştırılıyor...", text_color="#89B4FA")
         try:
-            fmt = self.combo_fmt.get().lower()
-            pwd = self.entry_pass.get().strip()
             out_name = f"beyt_archive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{fmt}"
             used_names = set()
             all_entries = []
             
-            for item in self.files_to_archive:
+            for item in files:
                 if os.path.isfile(item):
                     arcname = unique_arcname(os.path.basename(item), used_names)
                     all_entries.append((item, arcname))
@@ -617,14 +1001,24 @@ class BeytarchiverV37App(TkinterDnD.Tk):
                 with py7zr.SevenZipFile(out_name, "w", password=pwd if pwd else None) as z:
                     for fp, an in all_entries: z.write(fp, an)
             elif fmt == "tar":
+                if pwd:
+                    raise ValueError('TAR şifrelemeyi desteklemiyor; ZIP veya 7z seçin.')
                 with tarfile.open(out_name, "w") as tar:
                     for fp, an in all_entries: tar.add(fp, arcname=an)
+            else:
+                raise ValueError('Desteklenmeyen sıkıştırma biçimi.')
 
             self.safe_ui_update(self.lbl_status.configure, text=f"Sıkıştırma Başarılı: {out_name}", text_color="#A6E3A1")
             beep(1000, 300)
             send_notification("Beytarchiver", "Arşiv başarıyla oluşturuldu!")
         except Exception as e:
             self.safe_ui_update(self.lbl_status.configure, text=f"Hata: {e}", text_color="#F38BA8")
+        finally:
+            self.safe_ui_update(self.finish_compression)
+
+    def finish_compression(self):
+        self._compressing = False
+        self.btn_start.configure(state='normal')
 
     def build_extract_view(self):
         self.extract_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
@@ -643,7 +1037,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.extract_drop_zone.dnd_bind("<<Drop>>", self.handle_extract_drop)
 
     def select_extract_file(self):
-        selected = filedialog.askopenfilename(filetypes=[("Archives", "*.zip *.7z *.tar *.gz *.beyt")])
+        selected = filedialog.askopenfilename(filetypes=[("Archives", "*.zip *.7z *.tar *.gz *.tgz *.beyt")])
         if selected:
             self.archive_to_extract = selected
             self.safe_ui_update(self.lbl_status.configure, text=f"Seçilen Arşiv: {os.path.basename(selected)}", text_color="#A6E3A1")
@@ -655,33 +1049,30 @@ class BeytarchiverV37App(TkinterDnD.Tk):
             self.safe_ui_update(self.lbl_status.configure, text=f"Seçilen Arşiv: {os.path.basename(self.archive_to_extract)}", text_color="#A6E3A1")
 
     def start_extraction(self):
-        if not self.archive_to_extract: return
-        threading.Thread(target=self.extract_engine, daemon=True).start()
+        if self._extracting or not self.archive_to_extract:
+            return
+        archive, pwd = self.archive_to_extract, self.entry_ext_pass.get()
+        self._extracting = True
+        self.btn_start_extract.configure(state='disabled')
+        threading.Thread(target=self.extract_engine, args=(archive, pwd), daemon=True).start()
 
-    def extract_engine(self):
+    def extract_engine(self, archive, pwd):
         self.safe_ui_update(self.lbl_status.configure, text="Dosyalar Çıkartılıyor...", text_color="#89B4FA")
         try:
-            pwd = self.entry_ext_pass.get().strip()
-            out_dir = os.path.splitext(self.archive_to_extract)[0] + "_extracted"
-            os.makedirs(out_dir, exist_ok=True)
-            ext = os.path.splitext(self.archive_to_extract)[1].lower()
-            
-            if ext in [".zip", ".beyt"]:
-                with pyzipper.AESZipFile(self.archive_to_extract, 'r') as zf:
-                    if pwd: zf.setpassword(pwd.encode())
-                    zf.extractall(path=out_dir)
-            elif ext == ".7z":
-                with py7zr.SevenZipFile(self.archive_to_extract, 'r', password=pwd if pwd else None) as z:
-                    z.extractall(path=out_dir)
-            elif ext in [".tar", ".gz"]:
-                with tarfile.open(self.archive_to_extract, "r:*") as tar:
-                    tar.extractall(path=out_dir)
+            out_dir = os.path.splitext(archive)[0] + "_extracted"
+            safe_extract_archive(archive, out_dir, pwd)
                     
             self.safe_ui_update(self.lbl_status.configure, text="Çıkartma Başarılı!", text_color="#A6E3A1")
             beep(1000, 300)
             open_in_explorer(out_dir)
         except Exception as e:
             self.safe_ui_update(self.lbl_status.configure, text=f"Çıkartma Hatası: {e}", text_color="#F38BA8")
+        finally:
+            self.safe_ui_update(self.finish_extraction)
+
+    def finish_extraction(self):
+        self._extracting = False
+        self.btn_start_extract.configure(state='normal')
 
     def build_vault_view(self):
         self.vault_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
@@ -698,7 +1089,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.lbl_vault_status.pack(pady=15)
 
     def create_vault(self):
-        pwd = self.entry_vault_pass.get().strip()
+        pwd = self.entry_vault_pass.get()
         if not pwd:
             self.safe_ui_update(self.lbl_vault_status.configure, text="❌ Lütfen parola girin!", text_color="#F38BA8")
             return
@@ -800,7 +1191,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         if results:
             for res in results: self.safe_ui_update(self.av_box.insert, "end", f"{res}\n")
         else: 
-            self.safe_ui_update(self.av_box.insert, "end", "✅ Dosya temiz çıktı.\n")
+            self.safe_ui_update(self.av_box.insert, "end", "Bilinen test imzası veya uzantı uyarısı bulunmadı. Bu sonuç dosyanın güvenli olduğunu garanti etmez.\n")
             
         self.safe_ui_update(self.av_box.configure, state="disabled")
         beep(1000, 200)
@@ -835,23 +1226,31 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.chk_user_temp = ctk.CTkCheckBox(self.clean_opts, text="AppData Temp")
         self.chk_user_temp.select(); self.chk_user_temp.pack(pady=10, padx=12, anchor="w")
         self.chk_recycle = ctk.CTkCheckBox(self.clean_opts, text="Geri Dönüşüm")
-        self.chk_recycle.select(); self.chk_recycle.pack(pady=10, padx=12, anchor="w")
+        if sys.platform == 'win32':
+            self.chk_recycle.select()
+        else:
+            self.chk_recycle.configure(state='disabled')
+        self.chk_recycle.pack(pady=10, padx=12, anchor="w")
         
-        self.btn_scan_clean = ctk.CTkButton(self.clean_opts, text=self.t("scan"), fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=lambda: threading.Thread(target=self.scan_engine, daemon=True).start())
+        self.btn_scan_clean = ctk.CTkButton(self.clean_opts, text=self.t("scan"), fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.start_clean_scan)
         self.btn_scan_clean.pack(pady=15, padx=12, fill="x")
-        self.btn_do_clean = ctk.CTkButton(self.clean_opts, text=self.t("clean"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(weight="bold"), state="disabled", command=lambda: threading.Thread(target=self.clean_engine, daemon=True).start())
+        self.btn_do_clean = ctk.CTkButton(self.clean_opts, text=self.t("clean"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(weight="bold"), state="disabled", command=self.start_cleaning)
         self.btn_do_clean.pack(pady=5, padx=12, fill="x")
 
-    def scan_engine(self):
-        self.safe_ui_update(self.btn_scan_clean.configure, state="disabled", text="Taranıyor...")
-        self.junk_files.clear()
-        self.total_junk_bytes = 0
-        for item in self.clean_tree.get_children(): self.clean_tree.delete(item)
-        
+    def start_clean_scan(self):
+        if self._cleaning:
+            return
         scan_paths = []
         if self.chk_temp.get(): scan_paths.append((os.environ.get("TEMP"), "Windows Temp"))
         if self.chk_user_temp.get(): scan_paths.append((os.path.expanduser("~\\AppData\\Local\\Temp"), "User Temp"))
-        
+        self._cleaning = True
+        self.btn_scan_clean.configure(state='disabled', text='Taranıyor...')
+        self.btn_do_clean.configure(state='disabled')
+        threading.Thread(target=self.scan_engine, args=(tuple(scan_paths),), daemon=True).start()
+
+    def scan_engine(self, scan_paths):
+        self.safe_ui_update(self.clear_tree, self.clean_tree)
+        junk_files, total = [], 0
         for path, tag in scan_paths:
             if path and os.path.exists(path):
                 try:
@@ -860,32 +1259,60 @@ class BeytarchiverV37App(TkinterDnD.Tk):
                             fp = os.path.join(root, f)
                             try:
                                 fsize = os.path.getsize(fp)
-                                self.junk_files.append((fp, fsize))
-                                self.total_junk_bytes += fsize
+                                if os.path.islink(fp):
+                                    continue
+                                junk_files.append((fp, fsize))
+                                total += fsize
                                 self.safe_ui_update(self.clean_tree.insert, "", "end", values=(fp, format_size(fsize), tag))
                             except: pass
                 except: pass
                 
-        self.safe_ui_update(self.lbl_junk_size.configure, text=format_size(self.total_junk_bytes))
-        self.safe_ui_update(self.btn_scan_clean.configure, state="normal", text=self.t("scan"))
-        if self.junk_files or self.chk_recycle.get(): self.safe_ui_update(self.btn_do_clean.configure, state="normal")
+        self.safe_ui_update(self.finish_clean_scan, junk_files, total)
         beep(1000, 200)
 
-    def clean_engine(self):
-        self.safe_ui_update(self.btn_do_clean.configure, state="disabled", text="Temizleniyor...")
-        for fp, fsize in self.junk_files:
-            try: os.remove(fp)
-            except: pass
-            
-        if self.chk_recycle.get():
-            try: 
-                ctypes.windll.shell32.SHEmptyRecycleBinW(None, None, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND)
-            except: pass
-            
-        beep(1200, 300)
-        self.safe_ui_update(self.lbl_junk_size.configure, text="0.00 B", text_color="#A6E3A1")
-        send_notification("Beytarchiver", "Sistem çöpleri temizlendi! 🧹")
-        self.scan_engine()
+    def finish_clean_scan(self, files, total):
+        self.junk_files, self.total_junk_bytes = files, total
+        self._cleaning = False
+        self.lbl_junk_size.configure(text=format_size(total))
+        self.btn_scan_clean.configure(state='normal', text=self.t('scan'))
+        self.btn_do_clean.configure(state='normal' if files or self.chk_recycle.get() else 'disabled',
+                                    text=self.t('clean'))
+
+    def start_cleaning(self):
+        if self._cleaning:
+            return
+        files, recycle = tuple(self.junk_files), bool(self.chk_recycle.get())
+        if not messagebox.askyesno('Temizleme onayı',
+                f'{len(files)} geçici dosya silinecek.' +
+                (' Geri dönüşüm kutusu da boşaltılacak.' if recycle else '') +
+                ' Devam edilsin mi?', default='no', parent=self):
+            return
+        self._cleaning = True
+        self.btn_scan_clean.configure(state='disabled')
+        self.btn_do_clean.configure(state='disabled', text='Temizleniyor...')
+        threading.Thread(target=self.clean_engine, args=(files, recycle), daemon=True).start()
+
+    def clean_engine(self, files, recycle):
+        failures = 0
+        for fp, _ in files:
+            try:
+                os.remove(fp)
+            except OSError:
+                failures += 1
+        if recycle and sys.platform == 'win32':
+            try:
+                result = ctypes.windll.shell32.SHEmptyRecycleBinW(
+                    None, None, SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND)
+                if result:
+                    failures += 1
+            except OSError:
+                failures += 1
+        self.safe_ui_update(self.finish_cleaning, failures)
+
+    def finish_cleaning(self, failures):
+        self._cleaning = False
+        self.lbl_status.configure(text=f'Temizlik tamamlandı. Başarısız işlem: {failures}')
+        self.start_clean_scan()
 
     def build_analyzer_view(self):
         self.analyzer_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
@@ -910,7 +1337,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
             threading.Thread(target=self.analyze_disk_engine, args=(selected_dir,), daemon=True).start()
 
     def analyze_disk_engine(self, target_dir):
-        for item in self.ana_tree.get_children(): self.ana_tree.delete(item)
+        self.safe_ui_update(self.clear_tree, self.ana_tree)
         file_list = []
         for root, _, files in os.walk(target_dir):
             for f in files:
@@ -947,7 +1374,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
             threading.Thread(target=self.dup_scan_engine, args=(target,), daemon=True).start()
 
     def dup_scan_engine(self, target):
-        for item in self.dup_tree.get_children(): self.dup_tree.delete(item)
+        self.safe_ui_update(self.clear_tree, self.dup_tree)
         hashes = {}
         for root, _, files in os.walk(target):
             for f in files:
@@ -975,7 +1402,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         top = ctk.CTkFrame(self.shredder_panel, corner_radius=12, fg_color="#1E1E2E", height=100)
         top.pack(fill="x", pady=(0, 10))
         top.pack_propagate(False)
-        ctk.CTkLabel(top, text="🔥 Güvenli Dosya İmha (DoD 5220.22-M)", font=ctk.CTkFont(size=20, weight="bold"), text_color="#F38BA8").pack(pady=(15, 0))
+        ctk.CTkLabel(top, text="🔥 Dosyanın Üzerine Yaz ve Sil", font=ctk.CTkFont(size=20, weight="bold"), text_color="#F38BA8").pack(pady=(15, 0))
         
         body = ctk.CTkFrame(self.shredder_panel, corner_radius=10, fg_color="#181825")
         body.pack(fill="both", expand=True)
@@ -985,30 +1412,18 @@ class BeytarchiverV37App(TkinterDnD.Tk):
 
     def start_shred(self):
         selected = filedialog.askopenfilename()
-        if selected:
+        if selected and messagebox.askyesno('Geri alınamaz işlem',
+                f'{selected}\n\nBu dosyanın üzerine yazılıp dosya silinecek. '
+                'İşlem geri alınamaz. SSD, yedek ve dosya sistemi kopyalarında '
+                'verinin tamamen yok edildiği garanti edilemez. Devam edilsin mi?',
+                default='no', parent=self):
             self.lbl_shred_file.configure(text=f"İmha Ediliyor: {os.path.basename(selected)}", text_color="#F38BA8")
             threading.Thread(target=self.shred_engine, args=(selected,), daemon=True).start()
 
     def shred_engine(self, path):
         try:
-            # RAM Patlamasını Önleyen Bellek Dostu Chunk (Parçalı) Sistem
-            size = os.path.getsize(path)
-            chunk_size = 1024 * 1024  # 1 MB'lık parçalar
-            os.chmod(path, 0o777)
-            
-            for pass_type in [b"\x00", b"\xFF", None]:
-                with open(path, "r+b") as f:
-                    written = 0
-                    while written < size:
-                        current_chunk = min(chunk_size, size - written)
-                        data = pass_type * current_chunk if pass_type else os.urandom(current_chunk)
-                        f.write(data)
-                        written += current_chunk
-                    f.flush()
-                    os.fsync(f.fileno())
-            
-            os.remove(path)
-            self.safe_ui_update(self.lbl_shred_file.configure, text="✅ Dosya Tamamen İmha Edildi!", text_color="#A6E3A1")
+            overwrite_and_delete(path)
+            self.safe_ui_update(self.lbl_shred_file.configure, text="✅ Dosyanın üzerine yazıldı ve dosya silindi; fiziksel silme garantisi yoktur.", text_color="#A6E3A1")
             beep(1200, 300)
         except Exception as e:
             self.safe_ui_update(self.lbl_shred_file.configure, text=f"Hata: {e}", text_color="#F38BA8")
