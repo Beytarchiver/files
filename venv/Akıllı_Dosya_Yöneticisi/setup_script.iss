@@ -1,11 +1,14 @@
+#define MyAppVersion "3.7"
+
 [Setup]
 AppName=Beytarchiver Pro Enterprise
-AppVersion=3.5
+AppVersion={#MyAppVersion}
+VersionInfoVersion=3.7.0.0
 AppPublisher=Beytarchiver Inc.
 DefaultDirName={autopf}\Beytarchiver
 DefaultGroupName=Beytarchiver
 OutputDir=Output
-OutputBaseFilename=Beytarchiver_v3.5_Setup
+OutputBaseFilename=Beytarchiver_v{#MyAppVersion}_Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
