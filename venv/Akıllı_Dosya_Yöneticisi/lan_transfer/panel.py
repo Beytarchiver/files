@@ -57,7 +57,7 @@ class TransferPanel(ctk.CTkFrame):
         self.qr_label.pack(pady=5)
         self.address = ctk.CTkLabel(self, text='')
         self.address.pack(pady=2)
-        self.status = ctk.CTkLabel(self, text='Hazır. Android uygulaması sonraki geliştirme aşamasında eklenecek.',
+        self.status = ctk.CTkLabel(self, text='Hazır. Telefonunuzla aynı yerel ağdaki arabirimi seçin.',
                                   wraplength=900)
         self.status.pack(pady=5)
         self.code = ctk.CTkLabel(self, text='', font=ctk.CTkFont(size=18, weight='bold'))
