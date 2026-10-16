@@ -80,3 +80,8 @@ platform annotations remain noted, not hidden as zero-warning verification.
 Task 5: actionlint passed after moving runner.temp-dependent SDK env into a step.
 A real GitHub run cannot yet be inspected: gh run list HTTP API returns Forbidden.
 Local APK creation is verified independently; remote Actions success is not assumed.
+
+Remote run 38898590224 was observable through the GitHub HTML UI despite API 403.
+Prepare Android SDK step failed immediately with exit 127. Runner image documents
+ANDROID_HOME, not sdkmanager on PATH; use its explicit cmdline-tools/latest/bin path.
+Actionlint remains green. Retry is a new push after this targeted diagnosis.

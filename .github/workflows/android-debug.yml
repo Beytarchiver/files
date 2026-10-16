@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p "$ANDROID_USER_HOME"
-          sdkmanager "platforms;android-35" "build-tools;34.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;34.0.0"
           sudo apt-get update
           sudo apt-get install -y xvfb xauth python3-tk
           python -m pip install -r beytarchiver-requirements.txt pytest==9.1.1
