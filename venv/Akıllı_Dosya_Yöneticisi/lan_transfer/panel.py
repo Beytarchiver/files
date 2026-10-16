@@ -27,7 +27,9 @@ def local_interfaces():
 
 class TransferPanel(ctk.CTkFrame):
     def __init__(self, parent, dispatch, server_factory=TransferServer):
-        super().__init__(parent, fg_color='transparent')
+        # The host is a plain TkinterDnD root: transparent frames can retain its
+        # initial light background even after the application's dark palette loads.
+        super().__init__(parent, fg_color=('#F2F2F2', '#1E1E2E'))
         self._dispatch, self._factory = dispatch, server_factory
         self._closing = False
         self._server = None

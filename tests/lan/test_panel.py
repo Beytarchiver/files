@@ -32,6 +32,37 @@ def test_network_list_contains_only_active_private_ipv4(monkeypatch):
 
 
 @pytest.mark.skipif(not os.environ.get('DISPLAY'), reason='Requires a graphical display')
+@pytest.mark.parametrize('mode', ['dark', 'light'])
+def test_transfer_instructions_remain_readable_on_plain_tk_root(mode):
+    module = panel_module()
+    import tkinter as tk
+    previous = module.ctk.get_appearance_mode()
+    module.ctk.set_appearance_mode(mode)
+    root = tk.Tk()
+    root.configure(bg='white')
+    panel = module.TransferPanel(root, lambda callback, *args: callback(*args))
+    panel.pack(fill='both', expand=True)
+    try:
+        root.update()
+        def luminance(color):
+            channels = [value / 65535 for value in root.winfo_rgb(color)]
+            linear = [v / 12.92 if v <= .04045 else ((v + .055) / 1.055) ** 2.4
+                      for v in channels]
+            return sum(v * weight for v, weight in zip(linear, (.2126, .7152, .0722)))
+        for widget in (panel.status, panel.qr_label):
+            # Native Tk colors include the background inherited through transparent frames.
+            foreground = luminance(widget._label.cget('foreground'))
+            background = luminance(widget._label.cget('background'))
+            contrast = (max(foreground, background) + .05) / (min(foreground, background) + .05)
+            assert contrast >= 4.5, f'{mode}: unreadable instructions (contrast {contrast:.2f})'
+            assert widget.winfo_viewable()
+    finally:
+        panel.shutdown()
+        root.destroy()
+        module.ctk.set_appearance_mode(previous)
+
+
+@pytest.mark.skipif(not os.environ.get('DISPLAY'), reason='Requires a graphical display')
 def test_panel_worker_dispatch_and_duplicate_start(monkeypatch):
     module = panel_module()
     import tkinter as tk
