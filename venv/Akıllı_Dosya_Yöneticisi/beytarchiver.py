@@ -49,7 +49,7 @@ except ImportError:
     HAS_PLYER = False
 
 # --- Sabitler ve Versiyon ---
-CURRENT_VERSION = "3.7"
+CURRENT_VERSION = "4.0"
 VERSION_FILE = os.path.expanduser("~/.beytarchiver_version")
 SHERB_NOCONFIRMATION = 0x00000001
 SHERB_NOPROGRESSUI = 0x00000002
@@ -389,10 +389,10 @@ LANGUAGES = {
         "password": "Şifre (Opsiyonel)", "password_req": "Şifre (Gerekliyse)",
         "theme": "Görünüm Modu:", "color_palette": "Renk Teması / Palette:", "language": "Dil / Language:",
         "junk_sub": "Temizlenebilir Sistem Çöpü", "scan": "🔍 Tara", "clean": "🧹 Temizle",
-        "av_title": "🛡️ Beytarchiver Güvenlik Motoru v3.7 Ultimate", "av_sub": "Kurumsal İmza & Sezgisel Derin Analiz",
+        "av_title": f"🛡️ Beytarchiver Güvenlik Motoru v{CURRENT_VERSION} Ultimate", "av_sub": "Kurumsal İmza & Sezgisel Derin Analiz",
         "av_select": "🔍 Taranacak Dosya Seç", "no_file": "Dosya Seçilmedi",
-        "update_title": "🚀 Beytarchiver v3.7 Pro Ultimate Raporu",
-        "update_notes": "📌 SÜRÜM GELİŞİM GEÇMİŞİ:\n\n✨ v3.7 (Ultimate Edition):\n• 📈 CANLI İZLEYİCİ: CPU ve RAM kullanımı anlık takibi eklendi.\n• 🔑 ŞİFRE YÖNETİCİSİ: Ana parolalı AES-256-GCM kasa ve otomatik kilitleme.\n• 🛠️ AV OPTİMİZASYONU: False-Positive (Yanlış Alarm) uyarıları azaltıldı.\n• 🧹 REGISTRY CLEANER: Kayıt defteri optimizasyonu sağlandı.\n• 🛡️ Dosya Silme: Onaylı, parçalı üç geçişli üzerine yazma; SSD silme garantisi yoktur.\n• 🛠️ UI Stability: UI Queue (Kuyruk) mimarisi ile Thread-Safe yapıldı.",
+        "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Ultimate Raporu",
+        "update_notes": "📌 SÜRÜM GELİŞİM GEÇMİŞİ:\n\n✨ v4.0:\n• 📱 TELEFONLA AKTAR: Aynı yerel ağda Android telefona dosya gönderme.\n• 🔗 QR ile eşleştirme, altı haneli kod onayı ve TLS bağlantısı.\n• ✅ SHA-256 doğrulaması ve telefondan kayıt onayı.\n• 🧪 Android istemcisi alpha aşamasında; aktarım sırasında açık tutulmalıdır.\n\n✨ v3.7 (Ultimate Edition):\n• 📈 CANLI İZLEYİCİ: CPU ve RAM kullanımı anlık takibi eklendi.\n• 🔑 ŞİFRE YÖNETİCİSİ: Ana parolalı AES-256-GCM kasa ve otomatik kilitleme.\n• 🛠️ AV OPTİMİZASYONU: False-Positive (Yanlış Alarm) uyarıları azaltıldı.\n• 🧹 REGISTRY CLEANER: Kayıt defteri optimizasyonu sağlandı.\n• 🛡️ Dosya Silme: Onaylı, parçalı üç geçişli üzerine yazma; SSD silme garantisi yoktur.\n• 🛠️ UI Stability: UI Queue (Kuyruk) mimarisi ile Thread-Safe yapıldı.",
         "btn_close_update": "Harika, Başlayalım! 🚀"
     },
     "EN": {
@@ -408,10 +408,10 @@ LANGUAGES = {
         "password": "Password (Optional)", "password_req": "Password (If Required)",
         "theme": "Appearance Mode:", "color_palette": "Color Theme / Palette:", "language": "Language / Dil:",
         "junk_sub": "Cleanable System Junk", "scan": "🔍 Scan", "clean": "🧹 Clean",
-        "av_title": "🛡️ Beytarchiver Security Engine v3.7 Ultimate", "av_sub": "Enterprise Signature & Heuristic Analysis",
+        "av_title": f"🛡️ Beytarchiver Security Engine v{CURRENT_VERSION} Ultimate", "av_sub": "Enterprise Signature & Heuristic Analysis",
         "av_select": "🔍 Select File to Scan", "no_file": "No File Selected",
-        "update_title": "🚀 Beytarchiver v3.7 Pro Ultimate Changelog",
-        "update_notes": "📌 VERSION CHANGELOG:\n\n✨ v3.7 (Ultimate Edition):\n• 📈 LIVE MONITOR: Real-time CPU and RAM tracking.\n• 🔑 PASSWORD MANAGER: Master-password protected AES-256-GCM vault and automatic locking.\n• 🛠️ AV OPTIMIZATION: Reduced false-positive warnings.\n• 🧹 REGISTRY CLEANER: Added registry optimization module.\n• 🛡️ File Removal: Confirmed, chunked three-pass overwrite; no SSD erasure guarantee.\n• 🛠️ UI Stability: Full Thread-Safe UI Queue implemented.",
+        "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Ultimate Changelog",
+        "update_notes": "📌 VERSION CHANGELOG:\n\n✨ v4.0:\n• 📱 PHONE TRANSFER: Send files to Android on the same local network.\n• 🔗 QR pairing, six-digit code approval and TLS connection.\n• ✅ SHA-256 verification and saved-file acknowledgement.\n• 🧪 Android client is in alpha; keep it open during transfers.\n\n✨ v3.7 (Ultimate Edition):\n• 📈 LIVE MONITOR: Real-time CPU and RAM tracking.\n• 🔑 PASSWORD MANAGER: Master-password protected AES-256-GCM vault and automatic locking.\n• 🛠️ AV OPTIMIZATION: Reduced false-positive warnings.\n• 🧹 REGISTRY CLEANER: Added registry optimization module.\n• 🛡️ File Removal: Confirmed, chunked three-pass overwrite; no SSD erasure guarantee.\n• 🛠️ UI Stability: Full Thread-Safe UI Queue implemented.",
         "btn_close_update": "Awesome, Let's Go! 🚀"
     }
 }
@@ -640,7 +640,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
                 lbl_logo.pack(side="left", padx=(12, 5), pady=10)
             except: pass
         else:
-            lbl_logo_text = ctk.CTkLabel(self.toolbar, text="⚡ BEYT v3.7", font=ctk.CTkFont(size=16, weight="bold"), text_color="#89B4FA")
+            lbl_logo_text = ctk.CTkLabel(self.toolbar, text=f"⚡ BEYT v{CURRENT_VERSION}", font=ctk.CTkFont(size=16, weight="bold"), text_color="#89B4FA")
             lbl_logo_text.pack(side="left", padx=(15, 10), pady=10)
 
         self.create_tb_btn("➕ Ekle", self.select_compress_files)

@@ -1,4 +1,4 @@
-# Beytarchiver 3.7
+# Beytarchiver 4.0
 
 Python 3.10 veya üzeri ve Tkinter gerekir. Windows sistem araçları (winget,
 kayıt defteri, RAM temizleme ve geri dönüşüm kutusu) Windows'a özeldir.
@@ -68,7 +68,8 @@ atlanır. Windows sistem araçları ayrıca Windows üzerinde doğrulanmalıdır
 Masaüstünde **Telefonla Aktar** paneli ve `android/` altında Android alpha istemcisi
 eklendi. Test APK'sı Gradle ile üretilebilir; GitHub Actions akışı APK ve SHA-256
 artifact'i hazırlar. [Android kurulum ve test adımları](docs/android-install-and-test.md).
-Pencere / kurulum sürümü, gerçek cihaz kabul testi tamamlanana kadar 3.7 olarak kalır.
+Masaüstü pencere ve kurulum sürümü 4.0 olarak güncellendi. Android istemcisi
+4.0.0-alpha.1 test sürümüdür; gerçek cihaz kabul testleri henüz tamamlanmadı.
 
 - Bağımlılıkları `python -m pip install -r beytarchiver-requirements.txt` ile güncelleyin.
 - Aynı ağa bağlı özel IPv4 arabirimini seçip **Bağlantı Başlat** düğmesini kullanın.
@@ -91,10 +92,10 @@ Pencere / kurulum sürümü, gerçek cihaz kabul testi tamamlanana kadar 3.7 ola
 Bu prototip genel dosya gezme, uzaktan komut çalıştırma, internetten erişim,
 telefondan bilgisayara gönderme veya kesilen aktarıma devam etme sağlamaz.
 
-Windows EXE yeniden derlenecekse kaynak klasöründe, proje sanal ortamı ile:
+Windows EXE yeniden derlenecekse depo kökünde:
 
 ```powershell
-& "..\..\.venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onedir --windowed --name Beytarchiver --collect-all customtkinter --collect-all tkinterdnd2 --collect-all qrcode beytarchiver.py
+powershell -ExecutionPolicy Bypass -File .\build_windows.ps1
 ```
 
 Bu komutun çıktısı Windows'ta ayrıca denenmelidir; bu Linux ortamında Windows EXE
@@ -102,3 +103,20 @@ Bu komutun çıktısı Windows'ta ayrıca denenmelidir; bu Linux ortamında Wind
 uyumluluğu JVM testinde doğrulandı. Gerçek telefon kamerası / dosya sağlayıcısı ve
 Windows güvenlik duvarı kabul testleri bekliyor. Protokol örnekleri
 `protocol/lan-v1-fixtures.json`, masaüstü regresyonları `tests/lan/` altındadır.
+
+## Windows 4.0 kurulum paketi
+
+Depo kökünde PowerShell ile `powershell -ExecutionPolicy Bypass -File .\build_windows.ps1`
+çalıştırın. Betik ayrı `.venv` ortamını hazırlar, bağımlılıkları kurar ve
+`dist\Beytarchiver\Beytarchiver.exe` üretir. Kaynak `venv` klasörü silinmez.
+Önce bu EXE'yi açıp başlıkta 4.0 ve **Telefonla Aktar** panelini kontrol edin.
+
+Ardından Inno Setup 6 ile kökteki `setup_scriss.iss` dosyasını açıp **Compile**
+seçin. Çıktı: `Output\Beytarchiver_v4.0_Setup.exe`. Eski 3.5 `.iss` veya eski
+`dist` klasörünü kullanmayın. Kurulum uygulama çalışıyorsa kapatılmasını ister;
+önce etkin aktarımı bitirin. Kurulum scripti önceki varsayılan AppId olan
+`Beytarchiver Pro Enterprise` değerini korur. Kişisel eski scriptinizde özel bir
+AppId varsa yükseltme için aynı değeri bu dosyada kullanın.
+
+Windows EXE ve Inno Setup derlemesi Windows üzerinde yapılmalıdır; Linux'ta
+bu paketler üretilmedi veya kurularak doğrulanmadı.
