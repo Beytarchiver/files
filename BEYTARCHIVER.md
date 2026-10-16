@@ -62,3 +62,43 @@ python -m pytest -q
 Dosya işlemleri testlerde yalnızca geçici verilere uygulanır. Linux'ta gerçek
 Tk arayüz testi için bir grafik ekranı (`DISPLAY`) gerekir; ekran yoksa bu test
 atlanır. Windows sistem araçları ayrıca Windows üzerinde doğrulanmalıdır.
+
+## 4.0 önizleme: bilgisayardan telefona aktarım altyapısı
+
+Masaüstünde **Telefonla Aktar** paneli ve `android/` altında Android alpha istemcisi
+eklendi. Test APK'sı Gradle ile üretilebilir; GitHub Actions akışı APK ve SHA-256
+artifact'i hazırlar. [Android kurulum ve test adımları](docs/android-install-and-test.md).
+Pencere / kurulum sürümü, gerçek cihaz kabul testi tamamlanana kadar 3.7 olarak kalır.
+
+- Bağımlılıkları `python -m pip install -r beytarchiver-requirements.txt` ile güncelleyin.
+- Aynı ağa bağlı özel IPv4 arabirimini seçip **Bağlantı Başlat** düğmesini kullanın.
+  Birden fazla arabirimde Wi-Fi veya telefonla aynı yerel ağdaki Ethernet'i seçin.
+- 120 saniyelik QR, geçici TLS sertifikasının parmak izini ve eşleştirme bilgisini
+  içerir. Süresi dolunca yenilenir. QR'ı veya ekran görüntüsünü başkalarıyla paylaşmayın.
+- İki cihazdaki altı haneli kodu karşılaştırdıktan sonra **Kodlar Aynı — Onayla**
+  seçilir. Cihaz adı tek başına güvenilir kimlik değildir.
+- Dosya ancak onaydan sonra seçilir. En fazla 1 GiB, aynı anda tek dosya desteklenir.
+  Kaynak değiştirilmez; özel geçici kopya hazırlanıp SHA-256 hesaplanır.
+- Bilgisayar yalnızca telefon dosyanın kaydını doğrulayıp alındı bildirimi verince
+  tamamlandı gösterir. Gönderim bitmesi tek başına başarılı kayıt sayılmaz.
+- **Bağlantıyı Durdur** ve pencereyi kapatma, oturumu / soketleri ve geçici veriyi
+  temizler. Ani kapanıştan kalan tanınmış sahipsiz oturum dosyaları sonraki bağlantı
+  başlangıcında temizlenir; etkin oturumlar ve tanınmayan dosyalar korunur.
+- Windows güvenlik duvarı sorarsa uygulamaya yalnızca **özel ağ** erişimi verin.
+  Güvenlik duvarını kapatmayın. Misafir ağı izolasyonu, VPN veya yanlış arabirim
+  bağlantıyı engelleyebilir. Telefonun sunucuya ulaşabilmesi gerekir.
+
+Bu prototip genel dosya gezme, uzaktan komut çalıştırma, internetten erişim,
+telefondan bilgisayara gönderme veya kesilen aktarıma devam etme sağlamaz.
+
+Windows EXE yeniden derlenecekse kaynak klasöründe, proje sanal ortamı ile:
+
+```powershell
+& "..\..\.venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onedir --windowed --name Beytarchiver --collect-all customtkinter --collect-all tkinterdnd2 --collect-all qrcode beytarchiver.py
+```
+
+Bu komutun çıktısı Windows'ta ayrıca denenmelidir; bu Linux ortamında Windows EXE
+üretilmez. Android test APK'sı yerel SDK ile derlendi; Python–OkHttp TLS ve hash
+uyumluluğu JVM testinde doğrulandı. Gerçek telefon kamerası / dosya sağlayıcısı ve
+Windows güvenlik duvarı kabul testleri bekliyor. Protokol örnekleri
+`protocol/lan-v1-fixtures.json`, masaüstü regresyonları `tests/lan/` altındadır.

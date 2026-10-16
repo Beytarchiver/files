@@ -5,3 +5,4 @@ pyzipper==0.4.0
 tkinterdnd2==0.6.4
 psutil==7.2.2
 Pillow==12.3.0
+qrcode==8.2

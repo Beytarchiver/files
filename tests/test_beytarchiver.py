@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import sys
 from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
@@ -16,6 +17,7 @@ import pytest
 
 
 SOURCE = Path(__file__).parents[1] / 'venv/Akıllı_Dosya_Yöneticisi/beytarchiver.py'
+sys.path.insert(0, str(SOURCE.parent))
 spec = importlib.util.spec_from_file_location('beytarchiver', SOURCE)
 app = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(app)
@@ -281,7 +283,7 @@ def test_ui_queue_does_not_starve_the_event_loop():
 def test_passwords_view_uses_existing_panel():
     keys = ['compress', 'extract', 'vault', 'ram', 'updater', 'antivirus', 'cleaner',
             'analyzer', 'duplicates', 'shredder', 'organizer', 'startup', 'hash',
-            'monitor', 'password', 'settings']
+            'monitor', 'password', 'settings', 'transfer']
     target = SimpleNamespace(**{key + '_panel': Mock() for key in keys},
                              nav_btns={}, load_startup_apps=Mock(), start_monitor_loop=Mock(),
                              lock_passwords=Mock())

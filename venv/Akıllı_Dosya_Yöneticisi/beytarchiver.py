@@ -26,6 +26,7 @@ import py7zr
 import pyzipper
 from tkinter import filedialog, ttk, messagebox, simpledialog
 from tkinterdnd2 import DND_FILES, TkinterDnD
+from lan_transfer.panel import TransferPanel
 
 # --- Windows Özel Kütüphaneler ---
 try:
@@ -376,6 +377,7 @@ COLOR_THEMES = {
 
 LANGUAGES = {
     "TR": {
+        "transfer": "📱 Telefonla Aktar",
         "compress": "📦 Sıkıştırma", "extract": "📂 Çıkartma", "vault": "🔐 Gizli Kasa",
         "ram": "⚡ RAM Temizle", "updater": "🔄 Güncelleyici", "antivirus": "🛡️ Antivirüs",
         "cleaner": "🧹 Temizleyici", "analyzer": "📊 Disk Analizi", "duplicates": "👥 Çift Dosya",
@@ -394,6 +396,7 @@ LANGUAGES = {
         "btn_close_update": "Harika, Başlayalım! 🚀"
     },
     "EN": {
+        "transfer": "📱 Phone Transfer",
         "compress": "📦 Compress", "extract": "📂 Extract", "vault": "🔐 Vault",
         "ram": "⚡ RAM Cleaner", "updater": "🔄 Updater", "antivirus": "🛡️ Antivirus",
         "cleaner": "🧹 Cleaner", "analyzer": "📊 Disk Analyzer", "duplicates": "👥 Duplicates",
@@ -545,6 +548,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
 
     def close_app(self):
         self._closing = True
+        self.transfer_panel.shutdown()
         self.monitor_running = False
         self.lock_passwords()
         if self._queue_after is not None:
@@ -644,6 +648,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.create_tb_btn("🔐 Kasa", lambda: self.show_view("vault"))
         self.create_tb_btn("⚡ RAM", lambda: self.show_view("ram"))
         self.create_tb_btn("📈 İzleyici", lambda: self.show_view("monitor"))
+        self.create_tb_btn("📱 Telefon", lambda: self.show_view("transfer"))
         self.create_tb_btn("🛡️ Antivirüs", lambda: self.show_view("antivirus"))
         self.create_tb_btn("🧹 Temizleyici", lambda: self.show_view("cleaner"))
         self.create_tb_btn("🔑 Şifreler", lambda: self.show_view("passwords"))
@@ -667,6 +672,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
             ("organizer", "organizer"), ("startup", "startup"), ("hash", "hash"),
             ("monitor", "monitor"), ("passwords", "passwords"), ("settings", "settings")
         ]
+        views.insert(2, ('transfer', 'transfer'))
 
         for key, text_key in views:
             btn = ctk.CTkButton(self.view_bar, text=self.t(text_key), fg_color="transparent", width=85, height=28, command=lambda k=key: self.show_view(k))
@@ -680,7 +686,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
             self.compress_panel, self.extract_panel, self.vault_panel, self.ram_panel, self.updater_panel,
             self.antivirus_panel, self.cleaner_panel, self.analyzer_panel, self.duplicates_panel,
             self.shredder_panel, self.organizer_panel, self.startup_panel, self.hash_panel,
-            self.monitor_panel, self.password_panel, self.settings_panel
+            self.monitor_panel, self.password_panel, self.settings_panel, self.transfer_panel
         ]
         for panel in panels: panel.pack_forget()
         for btn in self.nav_btns.values(): btn.configure(fg_color="transparent")
@@ -710,6 +716,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.build_monitor_view()
         self.build_password_view()
         self.build_settings_view()
+        self.transfer_panel = TransferPanel(self.content_frame, self.safe_ui_update)
 
     # ==========================================
     # 📈 CANLI KAYNAK İZLEYİCİ

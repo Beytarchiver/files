@@ -1,0 +1,37 @@
+[
+  {
+    "name": "valid-private-origin",
+    "valid": true,
+    "payload": "{\"v\": 1, \"origin\": \"https://192.168.1.20:48123\", \"session_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"cert_sha256\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"pair_token\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\", \"expires_at\": \"2099-01-01T00:00:00Z\"}"
+  },
+  {
+    "name": "http",
+    "valid": false,
+    "payload": "{\"v\": 1, \"origin\": \"http://192.168.1.20:48123\", \"session_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"cert_sha256\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"pair_token\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\", \"expires_at\": \"2099-01-01T00:00:00Z\"}"
+  },
+  {
+    "name": "public-ip",
+    "valid": false,
+    "payload": "{\"v\": 1, \"origin\": \"https://8.8.8.8:443\", \"session_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"cert_sha256\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"pair_token\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\", \"expires_at\": \"2099-01-01T00:00:00Z\"}"
+  },
+  {
+    "name": "loopback",
+    "valid": false,
+    "payload": "{\"v\": 1, \"origin\": \"https://127.0.0.1:443\", \"session_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"cert_sha256\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"pair_token\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\", \"expires_at\": \"2099-01-01T00:00:00Z\"}"
+  },
+  {
+    "name": "wrong-version",
+    "valid": false,
+    "payload": "{\"v\": 2, \"origin\": \"https://192.168.1.20:48123\", \"session_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"cert_sha256\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"pair_token\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\", \"expires_at\": \"2099-01-01T00:00:00Z\"}"
+  },
+  {
+    "name": "expired",
+    "valid": false,
+    "payload": "{\"v\": 1, \"origin\": \"https://192.168.1.20:48123\", \"session_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"cert_sha256\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"pair_token\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\", \"expires_at\": \"2000-01-01T00:00:00Z\"}"
+  },
+  {
+    "name": "invalid-pin",
+    "valid": false,
+    "payload": "{\"v\": 1, \"origin\": \"https://192.168.1.20:48123\", \"session_id\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"cert_sha256\": \"bad\", \"pair_token\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\", \"expires_at\": \"2099-01-01T00:00:00Z\"}"
+  }
+]
