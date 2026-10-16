@@ -56,6 +56,19 @@ SHERB_NOPROGRESSUI = 0x00000002
 SHERB_NOSOUND = 0x00000004
 
 # --- Yardımcı Fonksiyonlar ---
+def resource_path(relative_path):
+    for base in (
+        Path(getattr(sys, "_MEIPASS", "")),
+        Path(__file__).resolve().parent,
+        Path(__file__).resolve().parents[2],
+        Path.cwd(),
+    ):
+        if str(base):
+            candidate = base / relative_path
+            if candidate.exists():
+                return str(candidate)
+    return relative_path
+
 def beep(freq, dur):
     if winsound:
         try: winsound.Beep(freq, dur)
@@ -461,8 +474,9 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.geometry("1300x900")
         self.minsize(1100, 800)
 
-        if os.path.exists("logo.ico"):
-            try: self.iconbitmap("logo.ico")
+        ico_path = resource_path("logo.ico")
+        if os.path.exists(ico_path):
+            try: self.iconbitmap(ico_path)
             except: pass
 
         ctk.set_appearance_mode("dark")
@@ -632,9 +646,10 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.toolbar = ctk.CTkFrame(self, height=65, corner_radius=0, fg_color="#1E1E2E")
         self.toolbar.grid(row=0, column=0, sticky="ew")
 
-        if HAS_PIL and os.path.exists("logo.png"):
+        png_path = resource_path("logo.png")
+        if HAS_PIL and os.path.exists(png_path):
             try:
-                img = Image.open("logo.png")
+                img = Image.open(png_path)
                 ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(38, 38))
                 lbl_logo = ctk.CTkLabel(self.toolbar, image=ctk_img, text="")
                 lbl_logo.pack(side="left", padx=(12, 5), pady=10)

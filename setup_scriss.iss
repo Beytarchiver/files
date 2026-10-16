@@ -18,6 +18,7 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
+SetupIconFile={#BuildRoot}\logo.ico
 UninstallDisplayIcon={app}\Beytarchiver.exe
 
 [Tasks]
