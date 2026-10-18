@@ -1755,8 +1755,6 @@ class BeytarchiverApp(TkinterDnD.Tk):
         self.lang_menu.set(self.current_lang)
         self.lang_menu.pack(pady=(5, 30), padx=50)
 
-BeytarchiverV37App = BeytarchiverApp
-
 if __name__ == "__main__":
     app = BeytarchiverApp()
     app.mainloop()

@@ -237,7 +237,7 @@ def test_ui_queue_survives_callback_failure():
     queue.put((called.append, ('next callback',), {}))
     target = SimpleNamespace(ui_queue=queue, after=Mock(), report_callback_exception=Mock(),
                              process_ui_queue=Mock(), _closing=False)
-    app.BeytarchiverV37App.process_ui_queue(target)
+    app.BeytarchiverApp.process_ui_queue(target)
     assert called == ['next callback']
     target.after.assert_called_once()
     target.report_callback_exception.assert_called_once()
@@ -250,7 +250,7 @@ def test_shred_cancel_leaves_file_untouched(tmp_path, monkeypatch):
     worker = Mock()
     monkeypatch.setattr(app.threading, 'Thread', worker)
     target = SimpleNamespace(lbl_shred_file=Mock(), shred_engine=Mock())
-    app.BeytarchiverV37App.start_shred(target)
+    app.BeytarchiverApp.start_shred(target)
     worker.assert_not_called()
     assert path.read_text() == 'keep'
 
@@ -275,7 +275,7 @@ def test_ui_queue_does_not_starve_the_event_loop():
     for _ in range(250): queue.put((lambda: None, (), {}))
     target = SimpleNamespace(ui_queue=queue, after=Mock(), report_callback_exception=Mock(),
                              process_ui_queue=Mock(), _closing=False)
-    app.BeytarchiverV37App.process_ui_queue(target)
+    app.BeytarchiverApp.process_ui_queue(target)
     assert not queue.empty()
     target.after.assert_called_once()
 
@@ -287,7 +287,7 @@ def test_passwords_view_uses_existing_panel():
     target = SimpleNamespace(**{key + '_panel': Mock() for key in keys},
                              nav_btns={}, load_startup_apps=Mock(), start_monitor_loop=Mock(),
                              lock_passwords=Mock())
-    app.BeytarchiverV37App.show_view(target, 'passwords')
+    app.BeytarchiverApp.show_view(target, 'passwords')
     target.password_panel.pack.assert_called_once()
 
 
@@ -310,7 +310,7 @@ def test_background_scans_never_read_tree_widgets(tmp_path, method, args, tree):
                              safe_ui_update=lambda f, *a, **kw: queue.put((f,a,kw)))
     failures = []
     def run():
-        try: getattr(app.BeytarchiverV37App, method)(target, str(tmp_path))
+        try: getattr(app.BeytarchiverApp, method)(target, str(tmp_path))
         except Exception as exc: failures.append(exc)
     worker = threading.Thread(target=run); worker.start(); worker.join(timeout=5)
     assert not failures
@@ -324,10 +324,10 @@ def test_password_ui_preserves_spaces_and_replaces_existing_row(tmp_path):
                              refresh_passwords=Mock(), password_activity=Mock())
     target.ent_site.get.return_value = 'example.org'
     target.ent_pass.get.return_value = ' password with spaces '
-    app.BeytarchiverV37App.save_password(target)
+    app.BeytarchiverApp.save_password(target)
     assert vault.data == {'example.org': ' password with spaces '}
     target.ent_pass.get.return_value = 'replacement'
-    app.BeytarchiverV37App.save_password(target)
+    app.BeytarchiverApp.save_password(target)
     assert vault.data == {'example.org': 'replacement'}
     vault.lock(); vault.unlock('correct master password')
     assert vault.data == {'example.org': 'replacement'}
@@ -339,7 +339,7 @@ def test_cleaner_worker_uses_captured_options_only(tmp_path):
     target = SimpleNamespace(clear_tree=Mock(), clean_tree=Mock(),
                              finish_clean_scan=Mock(),
                              safe_ui_update=lambda f, *a, **kw: queue.put((f,a,kw)))
-    app.BeytarchiverV37App.scan_engine(target, [(str(tmp_path), 'Test')])
+    app.BeytarchiverApp.scan_engine(target, [(str(tmp_path), 'Test')])
     while not queue.empty():
         f, a, kw = queue.get(); f(*a, **kw)
     target.finish_clean_scan.assert_called_once()
@@ -355,7 +355,7 @@ def test_compression_captures_password_without_stripping(monkeypatch):
     target.combo_fmt.get.return_value='zip'
     target.entry_pass.get.return_value=' password '
     worker=Mock(); monkeypatch.setattr(app.threading, 'Thread', worker)
-    app.BeytarchiverV37App.start_compression(target)
+    app.BeytarchiverApp.start_compression(target)
     assert worker.call_args.kwargs['args'] == (('one',), 'zip', ' password ')
 
 
@@ -364,7 +364,7 @@ def test_extraction_captures_archive_before_starting_worker(monkeypatch):
                              entry_ext_pass=Mock(), btn_start_extract=Mock(), extract_engine=Mock())
     target.entry_ext_pass.get.return_value=' password '
     worker=Mock(); monkeypatch.setattr(app.threading, 'Thread', worker)
-    app.BeytarchiverV37App.start_extraction(target)
+    app.BeytarchiverApp.start_extraction(target)
     assert worker.call_args.kwargs['args'] == ('one.zip', ' password ')
 
 
@@ -376,7 +376,7 @@ def test_compression_worker_round_trip(tmp_path, monkeypatch, kind):
     target = SimpleNamespace(lbl_status=SimpleNamespace(configure=lambda **kw: statuses.append(kw['text'])),
                              finish_compression=Mock(), safe_ui_update=lambda f, *a, **kw: f(*a, **kw))
     password = '' if kind == 'tar' else ' password with spaces '
-    app.BeytarchiverV37App.compress_engine(target, (str(source),), kind, password)
+    app.BeytarchiverApp.compress_engine(target, (str(source),), kind, password)
     assert statuses[-1].startswith('Sıkıştırma Başarılı:')
     archive = next(tmp_path.glob('beyt_archive_*.' + kind))
     app.safe_extract_archive(archive, tmp_path / 'out', password)
@@ -391,7 +391,7 @@ def test_real_gui_navigation_vault_and_queue(tmp_path, monkeypatch):
     monkeypatch.setattr(app, 'VERSION_FILE', str(version))
     monkeypatch.setattr(app.simpledialog, 'askstring', lambda *a, **kw: 'test master password')
     monkeypatch.setattr(app.messagebox, 'askyesno', lambda *a, **kw: True)
-    window = app.BeytarchiverV37App()
+    window = app.BeytarchiverApp()
     errors = []
     window.report_callback_exception = lambda *error: errors.append(error)
     try:

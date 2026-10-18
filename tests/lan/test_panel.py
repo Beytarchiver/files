@@ -112,7 +112,7 @@ def test_main_window_contains_transfer_panel_and_shuts_it_down(tmp_path, monkeyp
     monkeypatch.setattr(app.Path,'home',lambda:tmp_path)
     marker=tmp_path/'version'; marker.write_text(app.CURRENT_VERSION)
     monkeypatch.setattr(app,'VERSION_FILE',str(marker))
-    window=app.BeytarchiverV37App()
+    window=app.BeytarchiverApp()
     try:
         assert 'transfer' in window.nav_btns
         window.show_view('transfer'); window.update()
