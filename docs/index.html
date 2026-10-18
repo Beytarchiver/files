@@ -31,13 +31,14 @@
           <li><a href="#features" data-i18n="navFeatures">Özellikler</a></li>
           <li><a href="#screens" data-i18n="navScreens">Ekranlar</a></li>
           <li><a href="#android" data-i18n="navAndroid">Android</a></li>
+          <li><a href="#guide" data-i18n="navGuide">Kurulum</a></li>
           <li><a href="#changelog" data-i18n="navChangelog">Sürüm Notları</a></li>
           <li><a href="#faq" data-i18n="navFaq">SSS</a></li>
         </ul>
       </nav>
       <div class="nav-actions">
         <button class="lang-btn" type="button" id="langToggle" aria-label="Switch to English">EN</button>
-        <a class="btn btn-sm btn-primary" href="https://github.com/beytu2855/files/releases/latest" data-i18n="navDownload">İndir</a>
+        <a class="btn btn-sm btn-primary" href="https://github.com/beytu2855/files/releases/download/v4.0.1/Beytarchiver_v4.0.1_Setup.exe" data-i18n="navDownload">İndir</a>
       </div>
     </div>
   </header>
@@ -51,13 +52,13 @@
           <h1 data-i18n-html="heroTitle">Dosyalarınız için <span class="grad">tek araç.</span></h1>
           <p class="lead" data-i18n="heroLead">Sıkıştırma, şifreli kasa, sistem temizliği, şifre yöneticisi ve telefona güvenli aktarım — hepsi Windows için tek, hafif bir uygulamada.</p>
           <div class="cta">
-            <a class="btn btn-primary btn-lg" href="https://github.com/beytu2855/files/releases/latest">
+            <a class="btn btn-primary btn-lg" href="https://github.com/beytu2855/files/releases/download/v4.0.1/Beytarchiver_v4.0.1_Setup.exe">
               <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M3 5.5 10.5 4.4v7.1H3V5.5Zm0 13 7.5 1.1v-7H3v5.9Zm8.4 1.2L21 21v-8.4h-9.6v7.1Zm0-15.4v7.2H21V3l-9.6 1.3Z"/></svg>
               <span data-i18n="ctaWin">Windows için İndir</span>
             </a>
-            <a class="btn btn-ghost btn-lg" href="https://github.com/beytu2855/files" data-i18n="ctaGithub">GitHub'da İncele</a>
+            <a class="btn btn-ghost btn-lg" href="#guide" data-i18n="ctaGithub">Kurulum Rehberi</a>
           </div>
-          <p class="meta" data-i18n="heroMeta">Ücretsiz · Windows 10/11 · 64-bit · Kurulum sihirbazı (Inno Setup)</p>
+          <p class="meta" data-i18n="heroMeta">Ücretsiz · Windows 10/11 · 64-bit · Doğrudan Kurulum Sihirbazı (.exe)</p>
         </div>
         <div class="hero-shot">
           <div class="window">
@@ -134,7 +135,7 @@
             <li><strong data-i18n="st3t">Gönderin</strong><span data-i18n="st3d">Dosyayı seçin; telefon kaydeder, SHA-256 doğrular ve alındı bildirimi gönderir.</span></li>
           </ol>
           <p class="note" data-i18n="andNote">⚠️ Android uygulaması alpha aşamasındadır (Android 8.0+). Debug imzalı APK, GitHub Actions üzerinden sağlanır.</p>
-          <a class="btn btn-ghost" href="https://github.com/beytu2855/files#-kurulum-rehberi" data-i18n="andBtn">Kurulum Rehberi</a>
+          <a class="btn btn-ghost" href="#guide" data-i18n="andBtn">Kurulum Rehberi</a>
         </div>
         <div class="phone reveal" aria-hidden="true">
           <div class="phone-screen">
@@ -148,8 +149,33 @@
       </div>
     </section>
 
+    <!-- INSTALLATION GUIDE (BUILT-IN) -->
+    <section class="section alt" id="guide">
+      <div class="wrap">
+        <header class="section-head reveal">
+          <p class="eyebrow" data-i18n="guideEyebrow">Adım Adım Kurulum</p>
+          <h2 data-i18n="guideTitle">1 Dakikada Kurulum Rehberi</h2>
+          <p data-i18n="guideLead">Ekstra Python veya kütüphane kurmanıza gerek yoktur; kurulum sihirbazı her şeyi otomatik hazırlar.</p>
+        </header>
+        <ul class="sec-grid">
+          <li class="reveal">
+            <h3 data-i18n="g1t">1️⃣ Kurulum Dosyasını İndirin</h3>
+            <p data-i18n="g1d">Yukarıdaki “Windows için İndir” düğmesine tıklayarak Beytarchiver_v4.0.1_Setup.exe dosyasını bilgisayarınıza indirin ve çift tıklayarak açın.</p>
+          </li>
+          <li class="reveal">
+            <h3 data-i18n="g2t">2️⃣ SmartScreen Bilgilendirmesi</h3>
+            <p data-i18n="g2d">Windows Mavi Ekran (SmartScreen) uyarısı çıkarsa “Ek bilgi (More info)” bağlantısına ve ardından “Yine de çalıştır (Run anyway)” düğmesine tıklayın.</p>
+          </li>
+          <li class="reveal">
+            <h3 data-i18n="g3t">3️⃣ Kurulumu Tamamlayın</h3>
+            <p data-i18n="g3d">İsterseniz “Masaüstü simgesi oluştur” kutucuğunu işaretleyin, “İleri → Kur” adımlarını tamamlayın. Uygulama otomatik olarak başlayacaktır.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
     <!-- SECURITY -->
-    <section class="section alt" id="security">
+    <section class="section" id="security">
       <div class="wrap">
         <header class="section-head reveal">
           <p class="eyebrow" data-i18n="secEyebrow">Güvenlik</p>
@@ -164,7 +190,7 @@
     </section>
 
     <!-- CHANGELOG -->
-    <section class="section" id="changelog">
+    <section class="section alt" id="changelog">
       <div class="wrap narrow">
         <header class="section-head reveal">
           <p class="eyebrow" data-i18n="chEyebrow">Sürüm Notları</p>
@@ -201,7 +227,7 @@
     </section>
 
     <!-- FAQ -->
-    <section class="section alt" id="faq">
+    <section class="section" id="faq">
       <div class="wrap narrow">
         <header class="section-head reveal">
           <p class="eyebrow" data-i18n="faqEyebrow">SSS</p>
@@ -214,7 +240,7 @@
           </details>
           <details name="faq">
             <summary data-i18n="q2">Windows SmartScreen uyarı verirse ne yapmalıyım?</summary>
-            <p data-i18n="a2">Yeni ve az indirilen uygulamalarda SmartScreen uyarı gösterebilir. Dosyayı yalnızca resmi GitHub Releases sayfasından indirdiyseniz “Ek bilgi → Yine de çalıştır” ile devam edebilirsiniz.</p>
+            <p data-i18n="a2">Yeni ve az indirilen uygulamalarda SmartScreen uyarı gösterebilir. Dosyayı resmi sitemizden indirdiyseniz “Ek bilgi → Yine de çalıştır” ile devam edebilirsiniz.</p>
           </details>
           <details name="faq">
             <summary data-i18n="q3">“Dosya Kontrolü” bir antivirüs yerine geçer mi?</summary>
@@ -241,7 +267,7 @@
       <img src="assets/logo.png" alt="" width="80" height="80" loading="lazy">
       <h2 data-i18n="finalTitle">Hemen denemeye başlayın</h2>
       <p data-i18n="finalLead">Kurulum bir dakikadan kısa sürer.</p>
-      <a class="btn btn-primary btn-lg" href="https://github.com/beytu2855/files/releases/latest" data-i18n="finalBtn">Beytarchiver v4.0.1'i İndir</a>
+      <a class="btn btn-primary btn-lg" href="https://github.com/beytu2855/files/releases/download/v4.0.1/Beytarchiver_v4.0.1_Setup.exe" data-i18n="finalBtn">Beytarchiver v4.0.1'i İndir</a>
     </section>
   </main>
 
