@@ -41,9 +41,12 @@ class TransferPanel(ctk.CTkFrame):
         self._ticks = 0
         self._interfaces = local_interfaces()
 
-        ctk.CTkLabel(self, text='📱 Telefonla Aktar — 4.0 önizleme',
-                     font=ctk.CTkFont(size=22, weight='bold')).pack(pady=(15, 5))
-        ctk.CTkLabel(self, text='Aynı Wi-Fi • Bilgisayardan telefona • Tek dosya, en fazla 1 GiB').pack(pady=5)
+        self._lang = 'TR'
+        self.title_label = ctk.CTkLabel(self, text='📱 Telefonla Aktar — 4.0 önizleme',
+                                        font=ctk.CTkFont(size=22, weight='bold'))
+        self.title_label.pack(pady=(15, 5))
+        self.subtitle_label = ctk.CTkLabel(self, text='Aynı Wi-Fi • Bilgisayardan telefona • Tek dosya, en fazla 1 GiB')
+        self.subtitle_label.pack(pady=5)
         controls = ctk.CTkFrame(self)
         controls.pack(fill='x', padx=15, pady=10)
         self.interface = ctk.CTkComboBox(controls, width=330,
@@ -80,6 +83,28 @@ class TransferPanel(ctk.CTkFrame):
         self.progress.set(0)
         self.progress.pack(pady=15)
         self._timer = self.after(100, self._tick)
+
+    def set_language(self, lang):
+        self._lang = 'EN' if str(lang).upper() == 'EN' else 'TR'
+        en = self._lang == 'EN'
+        self.title_label.configure(
+            text='📱 Phone Transfer — 4.0 Preview' if en else '📱 Telefonla Aktar — 4.0 önizleme')
+        self.subtitle_label.configure(
+            text='Same Wi-Fi • PC to Phone • Single file, up to 1 GiB'
+            if en else 'Aynı Wi-Fi • Bilgisayardan telefona • Tek dosya, en fazla 1 GiB')
+        self.start_button.configure(text='Start Connection' if en else 'Bağlantı Başlat')
+        self.stop_button.configure(text='Stop Connection' if en else 'Bağlantıyı Durdur')
+        self.approve_button.configure(text='Codes Match — Approve' if en else 'Kodlar Aynı — Onayla')
+        self.reject_button.configure(text='Reject' if en else 'Reddet')
+        self.select_button.configure(text='Select File' if en else 'Dosya Seç')
+        self.cancel_button.configure(text='Cancel Transfer' if en else 'Aktarımı İptal Et')
+        if self._server is None:
+            self.qr_label.configure(
+                text='QR code will appear here when connection starts.'
+                if en else 'Bağlantı başlatınca QR kodu burada görünür.')
+            self.status.configure(
+                text='Ready. Select the network interface on the same LAN as your phone.'
+                if en else 'Hazır. Telefonunuzla aynı yerel ağdaki arabirimi seçin.')
 
     def _post(self, callback, *args):
         if not self._closing:

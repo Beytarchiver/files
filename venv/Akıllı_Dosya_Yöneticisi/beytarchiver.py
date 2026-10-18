@@ -49,7 +49,7 @@ except ImportError:
     HAS_PLYER = False
 
 # --- Sabitler ve Versiyon ---
-CURRENT_VERSION = "4.0"
+CURRENT_VERSION = "4.0.1"
 VERSION_FILE = os.path.expanduser("~/.beytarchiver_version")
 SHERB_NOCONFIRMATION = 0x00000001
 SHERB_NOPROGRESSUI = 0x00000002
@@ -71,21 +71,32 @@ def resource_path(relative_path):
 
 def beep(freq, dur):
     if winsound:
-        try: winsound.Beep(freq, dur)
-        except: pass
+        def _play():
+            try:
+                winsound.Beep(freq, dur)
+            except Exception:
+                pass
+        if threading.current_thread() is threading.main_thread():
+            threading.Thread(target=_play, daemon=True).start()
+        else:
+            _play()
 
 def send_notification(title, message):
     if HAS_PLYER:
-        try: notification.notify(title=title, message=message, app_name="Beytarchiver", timeout=5)
-        except: pass
+        try:
+            notification.notify(title=title, message=message, app_name="Beytarchiver", timeout=5)
+        except Exception:
+            pass
 
 def get_path_size(path):
     if os.path.isfile(path): return os.path.getsize(path)
     total_size = 0
     for dirpath, _, filenames in os.walk(path):
         for f in filenames:
-            try: total_size += os.path.getsize(os.path.join(dirpath, f))
-            except: pass
+            try:
+                total_size += os.path.getsize(os.path.join(dirpath, f))
+            except Exception:
+                pass
     return total_size
 
 def format_size(bytes_val):
@@ -392,39 +403,79 @@ LANGUAGES = {
     "TR": {
         "transfer": "📱 Telefonla Aktar",
         "compress": "📦 Sıkıştırma", "extract": "📂 Çıkartma", "vault": "🔐 Gizli Kasa",
-        "ram": "⚡ RAM Temizle", "updater": "🔄 Güncelleyici", "antivirus": "🛡️ Antivirüs",
+        "ram": "⚡ Bellek Azalt", "updater": "🔄 Güncelleyici", "antivirus": "🛡️ Dosya Kontrol",
         "cleaner": "🧹 Temizleyici", "analyzer": "📊 Disk Analizi", "duplicates": "👥 Çift Dosya",
         "shredder": "🔥 Güvenli Sil", "organizer": "📁 Düzenleyici", "startup": "🚀 Başlangıç",
         "hash": "🧮 Hash", "settings": "⚙️ Ayarlar", "monitor": "📈 İzleyici", "passwords": "🔑 Şifreler",
+        "tb_add": "➕ Ekle", "tb_extract": "📂 Çıkart", "tb_vault": "🔐 Kasa", "tb_ram": "⚡ Bellek",
+        "tb_monitor": "📈 İzleyici", "tb_transfer": "📱 Telefon", "tb_av": "🛡️ Kontrol",
+        "tb_cleaner": "🧹 Temizleyici", "tb_passwords": "🔑 Şifreler", "tb_news": "📌 Yenilikler", "tb_settings": "⚙️ Ayarlar",
         "drop_compress": "Sıkıştırılacak dosya ve klasörleri buraya sürükleyin",
         "drop_extract": "Çıkartılacak arşivi (.zip, .7z, .tar, .beyt) buraya sürükleyin",
         "start_compress": "🚀 Sıkıştırmayı Başlat", "start_extract": "📂 Tümünü Çıkart",
         "password": "Şifre (Opsiyonel)", "password_req": "Şifre (Gerekliyse)",
         "theme": "Görünüm Modu:", "color_palette": "Renk Teması / Palette:", "language": "Dil / Language:",
         "junk_sub": "Temizlenebilir Sistem Çöpü", "scan": "🔍 Tara", "clean": "🧹 Temizle",
-        "av_title": f"🛡️ Beytarchiver Güvenlik Motoru v{CURRENT_VERSION} Ultimate", "av_sub": "Kurumsal İmza & Sezgisel Derin Analiz",
+        "av_title": f"🛡️ Beytarchiver Dosya Kontrolü v{CURRENT_VERSION}",
+        "av_sub": "EICAR Test İmzası & Uzantı Sezgisel Kontrolü",
         "av_select": "🔍 Taranacak Dosya Seç", "no_file": "Dosya Seçilmedi",
+        "ram_title": "⚡ Uygulama Bellek Azaltıcı",
+        "ram_btn": "⚡ Uygulamanın Bellek Kullanımını Azalt",
+        "ram_done": "✅ Uygulamanın çalışma kümesi (RAM kullanımı) azaltıldı!",
+        "monitor_title": "📈 Sistem Kaynak İzleyicisi",
+        "vault_title": "🔐 Beytarchiver Encrypted Vault (.beyt)",
+        "vault_btn": "🔐 Dosyaları Seç ve .beyt Kasası Oluştur",
+        "updater_btn": "🔍 Eski Sürüm Yazılımları Tara (winget)",
+        "analyzer_btn": "📁 Taranacak Klasörü/Sürücüyü Seç",
+        "dup_btn": "🔍 Klasör Seç ve Çift Dosyaları Tara",
+        "shred_title": "🔥 Dosyanın Üzerine Yaz ve Sil",
+        "shred_btn": "🔥 Kalıcı Olarak İmha Edilecek Dosyayı Seç",
+        "org_title": "📁 Akıllı Masaüstü ve Klasör Düzenleyici",
+        "org_desktop": "🖥️ Masaüstünü Düzenle",
+        "org_downloads": "📥 İndirilenler Klasörünü Düzenle",
+        "startup_title": "🚀 Windows Başlangıç Uygulamaları",
+        "hash_btn": "🔍 Hash Hesaplanacak Dosyayı Seç",
         "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Ultimate Raporu",
-        "update_notes": "📌 SÜRÜM GELİŞİM GEÇMİŞİ:\n\n✨ v4.0:\n• 📱 TELEFONLA AKTAR: Aynı yerel ağda Android telefona dosya gönderme.\n• 🔗 QR ile eşleştirme, altı haneli kod onayı ve TLS bağlantısı.\n• ✅ SHA-256 doğrulaması ve telefondan kayıt onayı.\n• 🧪 Android istemcisi alpha aşamasında; aktarım sırasında açık tutulmalıdır.\n\n✨ v3.7 (Ultimate Edition):\n• 📈 CANLI İZLEYİCİ: CPU ve RAM kullanımı anlık takibi eklendi.\n• 🔑 ŞİFRE YÖNETİCİSİ: Ana parolalı AES-256-GCM kasa ve otomatik kilitleme.\n• 🛠️ AV OPTİMİZASYONU: False-Positive (Yanlış Alarm) uyarıları azaltıldı.\n• 🧹 REGISTRY CLEANER: Kayıt defteri optimizasyonu sağlandı.\n• 🛡️ Dosya Silme: Onaylı, parçalı üç geçişli üzerine yazma; SSD silme garantisi yoktur.\n• 🛠️ UI Stability: UI Queue (Kuyruk) mimarisi ile Thread-Safe yapıldı.",
+        "update_notes": "📌 SÜRÜM GELİŞİM GEÇMİŞİ:\n\n✨ v4.0.1:\n• 🧹 TEMİZLEYİCİ: Windows Temp ve AppData Temp çift sayım hatası giderildi.\n• 📁 DÜZENLEYİCİ & ARŞİV: Onaylı arka plan düzenleme ve kaynak klasöre arşiv çıktısı.\n• ⚡ PERFORMANS: Boyut ön-gruplamalı hızlı çift dosya taraması ve sekme bazlı izleyici.\n• 🌐 ÇEVİRİ: Araç çubuğu, paneller ve Telefonla Aktar TR/EN dil desteği tamamlandı.\n\n✨ v4.0:\n• 📱 TELEFONLA AKTAR: Aynı yerel ağda Android telefona dosya gönderme.\n• 🔗 QR ile eşleştirme, altı haneli kod onayı ve TLS bağlantısı.\n• ✅ SHA-256 doğrulaması ve telefondan kayıt onayı.\n• 🧪 Android istemcisi alpha aşamasında; aktarım sırasında açık tutulmalıdır.\n\n✨ v3.7 (Ultimate Edition):\n• 📈 CANLI İZLEYİCİ: CPU ve RAM kullanımı anlık takibi eklendi.\n• 🔑 ŞİFRE YÖNETİCİSİ: Ana parolalı AES-256-GCM kasa ve otomatik kilitleme.\n• 🛠️ AV OPTİMİZASYONU: False-Positive (Yanlış Alarm) uyarıları azaltıldı.\n• 🛡️ Dosya Silme: Onaylı, parçalı üç geçişli üzerine yazma; SSD silme garantisi yoktur.\n• 🛠️ UI Stability: UI Queue (Kuyruk) mimarisi ile Thread-Safe yapıldı.",
         "btn_close_update": "Harika, Başlayalım! 🚀"
     },
     "EN": {
         "transfer": "📱 Phone Transfer",
         "compress": "📦 Compress", "extract": "📂 Extract", "vault": "🔐 Vault",
-        "ram": "⚡ RAM Cleaner", "updater": "🔄 Updater", "antivirus": "🛡️ Antivirus",
+        "ram": "⚡ Trim Memory", "updater": "🔄 Updater", "antivirus": "🛡️ File Check",
         "cleaner": "🧹 Cleaner", "analyzer": "📊 Disk Analyzer", "duplicates": "👥 Duplicates",
         "shredder": "🔥 Shredder", "organizer": "📁 Organizer", "startup": "🚀 Startup",
         "hash": "🧮 Hash", "settings": "⚙️ Settings", "monitor": "📈 Monitor", "passwords": "🔑 Passwords",
+        "tb_add": "➕ Add", "tb_extract": "📂 Extract", "tb_vault": "🔐 Vault", "tb_ram": "⚡ Memory",
+        "tb_monitor": "📈 Monitor", "tb_transfer": "📱 Phone", "tb_av": "🛡️ Check",
+        "tb_cleaner": "🧹 Cleaner", "tb_passwords": "🔑 Passwords", "tb_news": "📌 Changelog", "tb_settings": "⚙️ Settings",
         "drop_compress": "Drag files and folders to compress here",
         "drop_extract": "Drag archive (.zip, .7z, .tar, .beyt) here",
         "start_compress": "🚀 Start Compression", "start_extract": "📂 Extract All",
         "password": "Password (Optional)", "password_req": "Password (If Required)",
         "theme": "Appearance Mode:", "color_palette": "Color Theme / Palette:", "language": "Language / Dil:",
         "junk_sub": "Cleanable System Junk", "scan": "🔍 Scan", "clean": "🧹 Clean",
-        "av_title": f"🛡️ Beytarchiver Security Engine v{CURRENT_VERSION} Ultimate", "av_sub": "Enterprise Signature & Heuristic Analysis",
+        "av_title": f"🛡️ Beytarchiver File Check v{CURRENT_VERSION}",
+        "av_sub": "EICAR Test Signature & Extension Heuristic Check",
         "av_select": "🔍 Select File to Scan", "no_file": "No File Selected",
+        "ram_title": "⚡ Application Memory Trimmer",
+        "ram_btn": "⚡ Reduce Application Memory Usage",
+        "ram_done": "✅ Application working set (memory usage) reduced!",
+        "monitor_title": "📈 System Resource Monitor",
+        "vault_title": "🔐 Beytarchiver Encrypted Vault (.beyt)",
+        "vault_btn": "🔐 Select Files and Create .beyt Vault",
+        "updater_btn": "🔍 Scan Outdated Software (winget)",
+        "analyzer_btn": "📁 Select Folder/Drive to Scan",
+        "dup_btn": "🔍 Select Folder and Scan Duplicates",
+        "shred_title": "🔥 Overwrite and Delete File",
+        "shred_btn": "🔥 Select File to Permanently Shred",
+        "org_title": "📁 Smart Desktop and Folder Organizer",
+        "org_desktop": "🖥️ Organize Desktop",
+        "org_downloads": "📥 Organize Downloads",
+        "startup_title": "🚀 Windows Startup Applications",
+        "hash_btn": "🔍 Select File to Calculate Hash",
         "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Ultimate Changelog",
-        "update_notes": "📌 VERSION CHANGELOG:\n\n✨ v4.0:\n• 📱 PHONE TRANSFER: Send files to Android on the same local network.\n• 🔗 QR pairing, six-digit code approval and TLS connection.\n• ✅ SHA-256 verification and saved-file acknowledgement.\n• 🧪 Android client is in alpha; keep it open during transfers.\n\n✨ v3.7 (Ultimate Edition):\n• 📈 LIVE MONITOR: Real-time CPU and RAM tracking.\n• 🔑 PASSWORD MANAGER: Master-password protected AES-256-GCM vault and automatic locking.\n• 🛠️ AV OPTIMIZATION: Reduced false-positive warnings.\n• 🧹 REGISTRY CLEANER: Added registry optimization module.\n• 🛡️ File Removal: Confirmed, chunked three-pass overwrite; no SSD erasure guarantee.\n• 🛠️ UI Stability: Full Thread-Safe UI Queue implemented.",
+        "update_notes": "📌 VERSION CHANGELOG:\n\n✨ v4.0.1:\n• 🧹 CLEANER: Fixed duplicate counting between Windows Temp and AppData Temp.\n• 📁 ORGANIZER & ARCHIVE: Confirmed background organizer and source-folder archive output.\n• ⚡ PERFORMANCE: Size-grouped fast duplicate scanner and tab-scoped resource monitor.\n• 🌐 TRANSLATION: Full TR/EN localization across toolbar, panels, and Phone Transfer.\n\n✨ v4.0:\n• 📱 PHONE TRANSFER: Send files to Android on the same local network.\n• 🔗 QR pairing, six-digit code approval and TLS connection.\n• ✅ SHA-256 verification and saved-file acknowledgement.\n• 🧪 Android client is in alpha; keep it open during transfers.\n\n✨ v3.7 (Ultimate Edition):\n• 📈 LIVE MONITOR: Real-time CPU and RAM tracking.\n• 🔑 PASSWORD MANAGER: Master-password protected AES-256-GCM kasa and automatic locking.\n• 🛠️ AV OPTIMIZATION: Reduced false-positive warnings.\n• 🛡️ File Removal: Confirmed, chunked three-pass overwrite; no SSD erasure guarantee.\n• 🛠️ UI Stability: Full Thread-Safe UI Queue implemented.",
         "btn_close_update": "Awesome, Let's Go! 🚀"
     }
 }
@@ -445,7 +496,8 @@ class BeytNativeAntivirus:
                 for chunk in iter(lambda: f.read(8192), b""):
                     sha256.update(chunk)
             return sha256.hexdigest()
-        except: return None
+        except Exception:
+            return None
 
     def scan_file(self, file_path):
         results = []
@@ -466,18 +518,20 @@ class BeytNativeAntivirus:
         return results, file_hash
 
 # --- Ana Uygulama ---
-class BeytarchiverV37App(TkinterDnD.Tk):
+class BeytarchiverApp(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title(f"Beytarchiver v{CURRENT_VERSION} Pro Enterprise - Ultimate Edition")
+        self.title(f"Beytarchiver v{CURRENT_VERSION} Pro Enterprise")
         self.geometry("1300x900")
         self.minsize(1100, 800)
 
         ico_path = resource_path("logo.ico")
         if os.path.exists(ico_path):
-            try: self.iconbitmap(ico_path)
-            except: pass
+            try:
+                self.iconbitmap(ico_path)
+            except Exception:
+                pass
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
@@ -493,6 +547,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self._password_after = None
         self._reveal_after = None
         self._password_sites = {}
+        self.monitor_running = False
         self.protocol('WM_DELETE_WINDOW', self.close_app)
         self.process_ui_queue()
 
@@ -504,6 +559,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self._extracting = False
         self._compressing = False
         self._cleaning = False
+        self._organizing = False
 
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -524,7 +580,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.lbl_status = ctk.CTkLabel(self.status_bar, text="Sistem Hazır", font=ctk.CTkFont(size=12), text_color="#A6ADC8")
         self.lbl_status.pack(side="left", padx=10)
 
-        self.lbl_stats = ctk.CTkLabel(self.status_bar, text=f"Beytarchiver v{CURRENT_VERSION} Ultimate Edition Active", font=ctk.CTkFont(size=12), text_color="#A6ADC8")
+        self.lbl_stats = ctk.CTkLabel(self.status_bar, text=f"Beytarchiver v{CURRENT_VERSION} Pro Enterprise Active", font=ctk.CTkFont(size=12), text_color="#A6ADC8")
         self.lbl_stats.pack(side="right", padx=10)
 
         self.show_view("compress")
@@ -597,8 +653,10 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         last_version = ""
         if os.path.exists(VERSION_FILE):
             try:
-                with open(VERSION_FILE, "r") as f: last_version = f.read().strip()
-            except: pass
+                with open(VERSION_FILE, "r", encoding="utf-8") as f:
+                    last_version = f.read().strip()
+            except Exception:
+                pass
         if last_version != CURRENT_VERSION: self.show_update_notes_dialog()
 
     def show_update_notes_dialog(self):
@@ -619,8 +677,10 @@ class BeytarchiverV37App(TkinterDnD.Tk):
 
         def close_and_save():
             try:
-                with open(VERSION_FILE, "w") as f: f.write(CURRENT_VERSION)
-            except: pass
+                with open(VERSION_FILE, "w", encoding="utf-8") as f:
+                    f.write(CURRENT_VERSION)
+            except Exception:
+                pass
             dialog.destroy()
 
         btn_ok = ctk.CTkButton(dialog, text=self.t("btn_close_update"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=close_and_save)
@@ -632,6 +692,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
 
     def update_ui_language(self):
         for key, btn in self.nav_btns.items(): btn.configure(text=self.t(key))
+        for key, btn in getattr(self, "tb_btns", {}).items(): btn.configure(text=self.t(key))
         self.drop_lbl.configure(text=self.t("drop_compress"))
         self.extract_drop_lbl.configure(text=self.t("drop_extract"))
         self.btn_start.configure(text=self.t("start_compress"))
@@ -641,6 +702,31 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.lbl_av_status.configure(text=self.t("av_title"))
         self.lbl_av_sub.configure(text=self.t("av_sub"))
         self.btn_select_av_file.configure(text=self.t("av_select"))
+        self.lbl_hero_sub.configure(text=self.t("junk_sub"))
+        if not self._cleaning:
+            self.btn_scan_clean.configure(text=self.t("scan"))
+            self.btn_do_clean.configure(text=self.t("clean"))
+        self.lbl_ram_title.configure(text=self.t("ram_title"))
+        self.btn_clean_ram.configure(text=self.t("ram_btn"))
+        self.lbl_monitor_title.configure(text=self.t("monitor_title"))
+        self.lbl_vault_title.configure(text=self.t("vault_title"))
+        self.btn_create_vault.configure(text=self.t("vault_btn"))
+        self.btn_scan_updater.configure(text=self.t("updater_btn"))
+        self.btn_select_ana_dir.configure(text=self.t("analyzer_btn"))
+        self.btn_scan_dup.configure(text=self.t("dup_btn"))
+        self.lbl_shred_title.configure(text=self.t("shred_title"))
+        self.btn_shred_select.configure(text=self.t("shred_btn"))
+        self.lbl_org_title.configure(text=self.t("org_title"))
+        self.btn_org_desktop.configure(text=self.t("org_desktop"))
+        self.btn_org_downloads.configure(text=self.t("org_downloads"))
+        self.lbl_startup_title.configure(text=self.t("startup_title"))
+        self.btn_select_hash.configure(text=self.t("hash_btn"))
+        self.lbl_settings_header.configure(text="⚙️ " + self.t("settings"))
+        self.lbl_theme_title.configure(text=self.t("theme"))
+        self.lbl_palette_title.configure(text=self.t("color_palette"))
+        self.lbl_lang_title.configure(text=self.t("language"))
+        if hasattr(self, "transfer_panel") and hasattr(self.transfer_panel, "set_language"):
+            self.transfer_panel.set_language(self.current_lang)
 
     def build_toolbar(self):
         self.toolbar = ctk.CTkFrame(self, height=65, corner_radius=0, fg_color="#1E1E2E")
@@ -653,22 +739,25 @@ class BeytarchiverV37App(TkinterDnD.Tk):
                 ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(38, 38))
                 lbl_logo = ctk.CTkLabel(self.toolbar, image=ctk_img, text="")
                 lbl_logo.pack(side="left", padx=(12, 5), pady=10)
-            except: pass
+            except Exception:
+                pass
         else:
             lbl_logo_text = ctk.CTkLabel(self.toolbar, text=f"⚡ BEYT v{CURRENT_VERSION}", font=ctk.CTkFont(size=16, weight="bold"), text_color="#89B4FA")
             lbl_logo_text.pack(side="left", padx=(15, 10), pady=10)
 
-        self.create_tb_btn("➕ Ekle", self.select_compress_files)
-        self.create_tb_btn("📂 Çıkart", lambda: self.show_view("extract"))
-        self.create_tb_btn("🔐 Kasa", lambda: self.show_view("vault"))
-        self.create_tb_btn("⚡ RAM", lambda: self.show_view("ram"))
-        self.create_tb_btn("📈 İzleyici", lambda: self.show_view("monitor"))
-        self.create_tb_btn("📱 Telefon", lambda: self.show_view("transfer"))
-        self.create_tb_btn("🛡️ Antivirüs", lambda: self.show_view("antivirus"))
-        self.create_tb_btn("🧹 Temizleyici", lambda: self.show_view("cleaner"))
-        self.create_tb_btn("🔑 Şifreler", lambda: self.show_view("passwords"))
-        self.create_tb_btn("📌 Yenilikler", self.show_update_notes_dialog)
-        self.create_tb_btn("⚙️ Ayarlar", lambda: self.show_view("settings"))
+        self.tb_btns = {
+            "tb_add": self.create_tb_btn(self.t("tb_add"), self.select_compress_files),
+            "tb_extract": self.create_tb_btn(self.t("tb_extract"), lambda: self.show_view("extract")),
+            "tb_vault": self.create_tb_btn(self.t("tb_vault"), lambda: self.show_view("vault")),
+            "tb_ram": self.create_tb_btn(self.t("tb_ram"), lambda: self.show_view("ram")),
+            "tb_monitor": self.create_tb_btn(self.t("tb_monitor"), lambda: self.show_view("monitor")),
+            "tb_transfer": self.create_tb_btn(self.t("tb_transfer"), lambda: self.show_view("transfer")),
+            "tb_av": self.create_tb_btn(self.t("tb_av"), lambda: self.show_view("antivirus")),
+            "tb_cleaner": self.create_tb_btn(self.t("tb_cleaner"), lambda: self.show_view("cleaner")),
+            "tb_passwords": self.create_tb_btn(self.t("tb_passwords"), lambda: self.show_view("passwords")),
+            "tb_news": self.create_tb_btn(self.t("tb_news"), self.show_update_notes_dialog),
+            "tb_settings": self.create_tb_btn(self.t("tb_settings"), lambda: self.show_view("settings")),
+        }
 
     def create_tb_btn(self, text, command):
         btn = ctk.CTkButton(self.toolbar, text=text, width=85, height=42, fg_color="#313244", hover_color="#45475A", font=ctk.CTkFont(size=11, weight="bold"), command=command)
@@ -697,6 +786,8 @@ class BeytarchiverV37App(TkinterDnD.Tk):
     def show_view(self, view_name):
         if view_name != 'passwords':
             self.lock_passwords()
+        if view_name != 'monitor':
+            self.monitor_running = False
         panels = [
             self.compress_panel, self.extract_panel, self.vault_panel, self.ram_panel, self.updater_panel,
             self.antivirus_panel, self.cleaner_panel, self.analyzer_panel, self.duplicates_panel,
@@ -741,7 +832,8 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         top = ctk.CTkFrame(self.monitor_panel, corner_radius=12, fg_color="#1E1E2E", height=90)
         top.pack(fill="x", pady=(0, 10))
         top.pack_propagate(False)
-        ctk.CTkLabel(top, text="📈 Sistem Kaynak İzleyicisi", font=ctk.CTkFont(size=20, weight="bold"), text_color="#89B4FA").pack(pady=(15, 0))
+        self.lbl_monitor_title = ctk.CTkLabel(top, text=self.t("monitor_title"), font=ctk.CTkFont(size=20, weight="bold"), text_color="#89B4FA")
+        self.lbl_monitor_title.pack(pady=(15, 0))
 
         body = ctk.CTkFrame(self.monitor_panel, corner_radius=10, fg_color="#181825")
         body.pack(fill="both", expand=True, padx=20, pady=20)
@@ -771,7 +863,8 @@ class BeytarchiverV37App(TkinterDnD.Tk):
                     self.safe_ui_update(self.prog_cpu.set, cpu/100)
                     self.safe_ui_update(self.lbl_ram.configure, text=f"RAM Kullanımı: %{ram}")
                     self.safe_ui_update(self.prog_ram.set, ram/100)
-                except: pass
+                except Exception:
+                    pass
                 threading.Event().wait(1)
         threading.Thread(target=update_stats, daemon=True).start()
 
@@ -922,6 +1015,9 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         selected = self.pass_tree.selection()
         if selected:
             site = self._password_sites[selected[0]]
+            if getattr(self, "_closing", True) is False and hasattr(self, "tk"):
+                if not messagebox.askyesno("Şifre Silme Onayı", f"'{site}' kaydı kalıcı olarak silinsin mi?", default="no", parent=self):
+                    return
             data = dict(self.password_vault.data)
             data.pop(site, None)
             try:
@@ -999,7 +1095,9 @@ class BeytarchiverV37App(TkinterDnD.Tk):
     def compress_engine(self, files, fmt, pwd):
         self.safe_ui_update(self.lbl_status.configure, text="Sıkıştırılıyor...", text_color="#89B4FA")
         try:
-            out_name = f"beyt_archive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{fmt}"
+            first_parent = Path(files[0]).resolve().parent if files else Path.cwd()
+            target_dir = first_parent if first_parent.is_dir() and os.access(first_parent, os.W_OK) else Path.cwd()
+            out_name = str(target_dir / f"beyt_archive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{fmt}")
             used_names = set()
             all_entries = []
             
@@ -1008,8 +1106,8 @@ class BeytarchiverV37App(TkinterDnD.Tk):
                     arcname = unique_arcname(os.path.basename(item), used_names)
                     all_entries.append((item, arcname))
                 elif os.path.isdir(item):
-                    for root, _, files in os.walk(item):
-                        for f in files:
+                    for root, _, dir_files in os.walk(item):
+                        for f in dir_files:
                             fp = os.path.join(root, f)
                             rel = os.path.relpath(fp, start=os.path.dirname(item))
                             arcname = unique_arcname(rel, used_names)
@@ -1101,12 +1199,14 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         top = ctk.CTkFrame(self.vault_panel, corner_radius=12, fg_color="#1E1E2E", height=90)
         top.pack(fill="x", pady=(0, 10))
         top.pack_propagate(False)
-        ctk.CTkLabel(top, text="🔐 Beytarchiver Encrypted Vault (.beyt)", font=ctk.CTkFont(size=20, weight="bold"), text_color="#89B4FA").pack(pady=(15, 0))
+        self.lbl_vault_title = ctk.CTkLabel(top, text=self.t("vault_title"), font=ctk.CTkFont(size=20, weight="bold"), text_color="#89B4FA")
+        self.lbl_vault_title.pack(pady=(15, 0))
         body = ctk.CTkFrame(self.vault_panel, corner_radius=10, fg_color="#181825")
         body.pack(fill="both", expand=True)
         self.entry_vault_pass = ctk.CTkEntry(body, placeholder_text="Kasa İçin Güçlü Parola Girin", show="*", width=250)
         self.entry_vault_pass.pack(pady=20)
-        ctk.CTkButton(body, text="🔐 Dosyaları Seç ve .beyt Kasası Oluştur", fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.create_vault).pack(pady=10)
+        self.btn_create_vault = ctk.CTkButton(body, text=self.t("vault_btn"), fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.create_vault)
+        self.btn_create_vault.pack(pady=10)
         self.lbl_vault_status = ctk.CTkLabel(body, text="Kasa İşlemi Bekleniyor", font=ctk.CTkFont(size=13))
         self.lbl_vault_status.pack(pady=15)
 
@@ -1120,10 +1220,14 @@ class BeytarchiverV37App(TkinterDnD.Tk):
 
     def vault_engine(self, files, pwd):
         try:
-            out_name = f"secure_vault_{datetime.now().strftime('%Y%m%d_%H%M%S')}.beyt"
+            first_parent = Path(files[0]).resolve().parent if files else Path.cwd()
+            target_dir = first_parent if first_parent.is_dir() and os.access(first_parent, os.W_OK) else Path.cwd()
+            out_name = str(target_dir / f"secure_vault_{datetime.now().strftime('%Y%m%d_%H%M%S')}.beyt")
+            used_names = set()
             with pyzipper.AESZipFile(out_name, "w", compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES) as zf:
                 zf.setpassword(pwd.encode())
-                for f in files: zf.write(f, os.path.basename(f))
+                for f in files:
+                    zf.write(f, unique_arcname(os.path.basename(f), used_names))
             self.safe_ui_update(self.lbl_vault_status.configure, text=f"✅ Kasa Oluşturuldu: {out_name}", text_color="#A6E3A1")
             beep(1000, 300)
         except Exception as e:
@@ -1134,10 +1238,12 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         top = ctk.CTkFrame(self.ram_panel, corner_radius=12, fg_color="#1E1E2E", height=90)
         top.pack(fill="x", pady=(0, 10))
         top.pack_propagate(False)
-        ctk.CTkLabel(top, text="⚡ RAM Booster & Memory Purger", font=ctk.CTkFont(size=20, weight="bold"), text_color="#A6E3A1").pack(pady=(15, 0))
+        self.lbl_ram_title = ctk.CTkLabel(top, text=self.t("ram_title"), font=ctk.CTkFont(size=20, weight="bold"), text_color="#A6E3A1")
+        self.lbl_ram_title.pack(pady=(15, 0))
         body = ctk.CTkFrame(self.ram_panel, corner_radius=10, fg_color="#181825")
         body.pack(fill="both", expand=True)
-        ctk.CTkButton(body, text="⚡ Sistem Belleğini / RAM'i Temizle", fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(size=14, weight="bold"), command=self.clean_ram).pack(pady=30)
+        self.btn_clean_ram = ctk.CTkButton(body, text=self.t("ram_btn"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(size=14, weight="bold"), command=self.clean_ram)
+        self.btn_clean_ram.pack(pady=30)
         self.lbl_ram_status = ctk.CTkLabel(body, text="Hazır", font=ctk.CTkFont(size=13))
         self.lbl_ram_status.pack(pady=10)
 
@@ -1145,7 +1251,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         if sys.platform == "win32":
             try:
                 ctypes.windll.psapi.EmptyWorkingSet(-1)
-                self.safe_ui_update(self.lbl_ram_status.configure, text="✅ Sistem RAM'i başarıyla rahatlatıldı!", text_color="#A6E3A1")
+                self.safe_ui_update(self.lbl_ram_status.configure, text=self.t("ram_done"), text_color="#A6E3A1")
                 beep(1200, 200)
             except Exception as e:
                 self.safe_ui_update(self.lbl_ram_status.configure, text=f"Hata: {e}", text_color="#F38BA8")
@@ -1154,7 +1260,8 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.updater_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         top = ctk.CTkFrame(self.updater_panel, corner_radius=10)
         top.pack(fill="x", pady=(0, 10))
-        ctk.CTkButton(top, text="🔍 Eski Sürüm Yazılımları Tara (winget)", fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=lambda: threading.Thread(target=self.updater_engine, daemon=True).start()).pack(side="left", padx=15, pady=12)
+        self.btn_scan_updater = ctk.CTkButton(top, text=self.t("updater_btn"), fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=lambda: threading.Thread(target=self.updater_engine, daemon=True).start())
+        self.btn_scan_updater.pack(side="left", padx=15, pady=12)
         self.lbl_up_status = ctk.CTkLabel(top, text="Tarama Bekleniyor", font=ctk.CTkFont(size=12))
         self.lbl_up_status.pack(side="left", padx=10)
         self.up_box = ctk.CTkTextbox(self.updater_panel, height=220, corner_radius=10, state="disabled")
@@ -1203,7 +1310,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
     def run_custom_antivirus(self, file_path):
         self.safe_ui_update(self.av_box.configure, state="normal")
         self.safe_ui_update(self.av_box.delete, "1.0", "end")
-        self.safe_ui_update(self.av_box.insert, "end", f"🛡️ BEYTARCHIVER ULTIMATE SECURITY SCAN\n")
+        self.safe_ui_update(self.av_box.insert, "end", f"🛡️ BEYTARCHIVER DOSYA KONTROLÜ\n")
         self.safe_ui_update(self.av_box.insert, "end", f"📄 Dosya: {os.path.basename(file_path)}\n")
         self.safe_ui_update(self.av_box.insert, "end", "=" * 60 + "\n\n")
         
@@ -1263,8 +1370,20 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         if self._cleaning:
             return
         scan_paths = []
-        if self.chk_temp.get(): scan_paths.append((os.environ.get("TEMP"), "Windows Temp"))
-        if self.chk_user_temp.get(): scan_paths.append((os.path.expanduser("~\\AppData\\Local\\Temp"), "User Temp"))
+        seen_dirs = set()
+        candidates = []
+        if self.chk_temp.get():
+            sys_root = os.environ.get("SystemRoot") or os.environ.get("WINDIR") or r"C:\Windows"
+            candidates.append((os.path.join(sys_root, "Temp"), "Windows Temp"))
+        if self.chk_user_temp.get():
+            user_tmp = os.environ.get("TEMP") or os.path.expanduser(r"~\AppData\Local\Temp")
+            candidates.append((user_tmp, "AppData Temp"))
+        for raw_path, tag in candidates:
+            if raw_path:
+                norm_dir = os.path.normcase(os.path.abspath(raw_path))
+                if norm_dir not in seen_dirs:
+                    seen_dirs.add(norm_dir)
+                    scan_paths.append((raw_path, tag))
         self._cleaning = True
         self.btn_scan_clean.configure(state='disabled', text='Taranıyor...')
         self.btn_do_clean.configure(state='disabled')
@@ -1273,21 +1392,28 @@ class BeytarchiverV37App(TkinterDnD.Tk):
     def scan_engine(self, scan_paths):
         self.safe_ui_update(self.clear_tree, self.clean_tree)
         junk_files, total = [], 0
+        seen_files = set()
         for path, tag in scan_paths:
             if path and os.path.exists(path):
                 try:
-                    for root, dirs, files in os.walk(path):
-                        for f in files:
+                    for root, dirs, dir_files in os.walk(path):
+                        for f in dir_files:
                             fp = os.path.join(root, f)
+                            norm_fp = os.path.normcase(os.path.abspath(fp))
+                            if norm_fp in seen_files:
+                                continue
                             try:
-                                fsize = os.path.getsize(fp)
                                 if os.path.islink(fp):
                                     continue
+                                fsize = os.path.getsize(fp)
+                                seen_files.add(norm_fp)
                                 junk_files.append((fp, fsize))
                                 total += fsize
                                 self.safe_ui_update(self.clean_tree.insert, "", "end", values=(fp, format_size(fsize), tag))
-                            except: pass
-                except: pass
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
                 
         self.safe_ui_update(self.finish_clean_scan, junk_files, total)
         beep(1000, 200)
@@ -1340,7 +1466,7 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.analyzer_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         self.ana_top = ctk.CTkFrame(self.analyzer_panel, corner_radius=10)
         self.ana_top.pack(fill="x", pady=(0, 8))
-        self.btn_select_ana_dir = ctk.CTkButton(self.ana_top, text="📁 Taranacak Klasörü/Sürücüyü Seç", fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.start_disk_analysis)
+        self.btn_select_ana_dir = ctk.CTkButton(self.ana_top, text=self.t("analyzer_btn"), fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.start_disk_analysis)
         self.btn_select_ana_dir.pack(side="left", padx=10, pady=10)
         self.lbl_ana_path = ctk.CTkLabel(self.ana_top, text="Klasör Seçilmedi", font=ctk.CTkFont(size=12))
         self.lbl_ana_path.pack(side="left", padx=10)
@@ -1361,10 +1487,12 @@ class BeytarchiverV37App(TkinterDnD.Tk):
     def analyze_disk_engine(self, target_dir):
         self.safe_ui_update(self.clear_tree, self.ana_tree)
         file_list = []
-        for root, _, files in os.walk(target_dir):
-            for f in files:
-                try: file_list.append((f, os.path.getsize(os.path.join(root, f)), os.path.join(root, f)))
-                except: pass
+        for root, _, dir_files in os.walk(target_dir):
+            for f in dir_files:
+                try:
+                    file_list.append((f, os.path.getsize(os.path.join(root, f)), os.path.join(root, f)))
+                except Exception:
+                    pass
         
         file_list.sort(key=lambda x: x[1], reverse=True)
         top_files = file_list[:50]
@@ -1378,7 +1506,8 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.duplicates_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         top = ctk.CTkFrame(self.duplicates_panel, corner_radius=10)
         top.pack(fill="x", pady=(0, 8))
-        ctk.CTkButton(top, text="🔍 Klasör Seç ve Çift Dosyaları Tara", fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.start_dup_scan).pack(side="left", padx=10, pady=10)
+        self.btn_scan_dup = ctk.CTkButton(top, text=self.t("dup_btn"), fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.start_dup_scan)
+        self.btn_scan_dup.pack(side="left", padx=10, pady=10)
         self.lbl_dup_status = ctk.CTkLabel(top, text="Klasör Seçilmedi", font=ctk.CTkFont(size=12))
         self.lbl_dup_status.pack(side="left", padx=10)
         
@@ -1397,23 +1526,36 @@ class BeytarchiverV37App(TkinterDnD.Tk):
 
     def dup_scan_engine(self, target):
         self.safe_ui_update(self.clear_tree, self.dup_tree)
-        hashes = {}
-        for root, _, files in os.walk(target):
-            for f in files:
+        by_size = {}
+        for root, _, dir_files in os.walk(target):
+            for f in dir_files:
                 fp = os.path.join(root, f)
+                try:
+                    if os.path.islink(fp):
+                        continue
+                    fsize = os.path.getsize(fp)
+                    by_size.setdefault(fsize, []).append(fp)
+                except Exception:
+                    pass
+
+        hashes = {}
+        for fsize, candidates in by_size.items():
+            if len(candidates) < 2:
+                continue
+            for fp in candidates:
                 try:
                     h = self.av_engine.calculate_file_hash(fp)
                     if h:
-                        if h not in hashes: hashes[h] = []
-                        hashes[h].append(fp)
-                except: pass
+                        hashes.setdefault((fsize, h), []).append(fp)
+                except Exception:
+                    pass
                 
         count = 0
-        for h, file_list in hashes.items():
+        for (fsize, h), file_list in hashes.items():
             if len(file_list) > 1:
+                sz = format_size(fsize)
                 for fp in file_list:
                     count += 1
-                    sz = format_size(get_path_size(fp))
                     self.safe_ui_update(self.dup_tree.insert, "", "end", values=(h[:16] + "...", os.path.basename(fp), sz, fp))
                     
         self.safe_ui_update(self.lbl_dup_status.configure, text=f"Tarama Bitti: {count} kopya bulundu!", text_color="#A6E3A1")
@@ -1424,11 +1566,13 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         top = ctk.CTkFrame(self.shredder_panel, corner_radius=12, fg_color="#1E1E2E", height=100)
         top.pack(fill="x", pady=(0, 10))
         top.pack_propagate(False)
-        ctk.CTkLabel(top, text="🔥 Dosyanın Üzerine Yaz ve Sil", font=ctk.CTkFont(size=20, weight="bold"), text_color="#F38BA8").pack(pady=(15, 0))
+        self.lbl_shred_title = ctk.CTkLabel(top, text=self.t("shred_title"), font=ctk.CTkFont(size=20, weight="bold"), text_color="#F38BA8")
+        self.lbl_shred_title.pack(pady=(15, 0))
         
         body = ctk.CTkFrame(self.shredder_panel, corner_radius=10, fg_color="#181825")
         body.pack(fill="both", expand=True)
-        ctk.CTkButton(body, text="🔥 Kalıcı Olarak İmha Edilecek Dosyayı Seç", fg_color="#F38BA8", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.start_shred).pack(pady=20)
+        self.btn_shred_select = ctk.CTkButton(body, text=self.t("shred_btn"), fg_color="#F38BA8", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.start_shred)
+        self.btn_shred_select.pack(pady=20)
         self.lbl_shred_file = ctk.CTkLabel(body, text="Dosya Seçilmedi", font=ctk.CTkFont(size=13))
         self.lbl_shred_file.pack(pady=5)
 
@@ -1454,38 +1598,71 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.organizer_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         top = ctk.CTkFrame(self.organizer_panel, corner_radius=10)
         top.pack(fill="x", pady=(0, 10))
-        ctk.CTkLabel(top, text="📁 Akıllı Masaüstü ve Klasör Düzenleyici", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=15)
+        self.lbl_org_title = ctk.CTkLabel(top, text=self.t("org_title"), font=ctk.CTkFont(size=16, weight="bold"))
+        self.lbl_org_title.pack(pady=15)
         
         body = ctk.CTkFrame(self.organizer_panel, corner_radius=10, fg_color="#181825")
         body.pack(fill="both", expand=True)
-        ctk.CTkButton(body, text="🖥️ Masaüstünü Düzenle", fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=lambda: self.organize_dir(os.path.expanduser("~/Desktop"))).pack(pady=15)
-        ctk.CTkButton(body, text="📥 İndirilenler Klasörünü Düzenle", fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=lambda: self.organize_dir(os.path.expanduser("~/Downloads"))).pack(pady=10)
+        self.btn_org_desktop = ctk.CTkButton(body, text=self.t("org_desktop"), fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=lambda: self.organize_dir(os.path.expanduser("~/Desktop")))
+        self.btn_org_desktop.pack(pady=15)
+        self.btn_org_downloads = ctk.CTkButton(body, text=self.t("org_downloads"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=lambda: self.organize_dir(os.path.expanduser("~/Downloads")))
+        self.btn_org_downloads.pack(pady=10)
         self.lbl_org_status = ctk.CTkLabel(body, text="İşlem Bekleniyor", font=ctk.CTkFont(size=13))
         self.lbl_org_status.pack(pady=15)
 
     def organize_dir(self, target_path):
-        if not os.path.exists(target_path): return
+        if getattr(self, "_organizing", False):
+            return
+        if not os.path.exists(target_path):
+            self.safe_ui_update(self.lbl_org_status.configure, text=f"Klasör bulunamadı: {target_path}", text_color="#F38BA8")
+            return
+        if hasattr(self, "tk"):
+            if not messagebox.askyesno("Klasör Düzenleme Onayı",
+                    f"{target_path}\n\nBu klasördeki dosyalar alt klasörlere (Belgeler, Resimler, Arşivler) taşınacak. Devam edilsin mi?",
+                    default="no", parent=self):
+                return
+        self._organizing = True
+        self.safe_ui_update(self.lbl_org_status.configure, text="Düzenleniyor...", text_color="#89B4FA")
+        threading.Thread(target=self.organize_dir_engine, args=(target_path,), daemon=True).start()
+
+    def organize_dir_engine(self, target_path):
         categories = {"Belgeler": [".pdf", ".docx", ".txt"], "Resimler": [".jpg", ".jpeg", ".png"], "Arşivler": [".zip", ".7z"]}
-        moved = 0
-        for item in os.listdir(target_path):
-            fp = os.path.join(target_path, item)
-            if os.path.isfile(fp):
-                ext = os.path.splitext(item)[1].lower()
-                for cat, exts in categories.items():
-                    if ext in exts:
-                        cat_dir = os.path.join(target_path, cat)
-                        os.makedirs(cat_dir, exist_ok=True)
-                        shutil.move(fp, os.path.join(cat_dir, item))
-                        moved += 1; break
-                        
-        self.safe_ui_update(self.lbl_org_status.configure, text=f"✅ Başarılı! {moved} dosya kategorize edildi.", text_color="#A6E3A1")
-        beep(1000, 200)
+        moved, skipped = 0, 0
+        try:
+            for item in os.listdir(target_path):
+                fp = os.path.join(target_path, item)
+                if os.path.isfile(fp) and not os.path.islink(fp):
+                    ext = os.path.splitext(item)[1].lower()
+                    for cat, exts in categories.items():
+                        if ext in exts:
+                            cat_dir = os.path.join(target_path, cat)
+                            os.makedirs(cat_dir, exist_ok=True)
+                            base, ext_part = os.path.splitext(item)
+                            dest = os.path.join(cat_dir, item)
+                            n = 1
+                            while os.path.lexists(dest):
+                                dest = os.path.join(cat_dir, f"{base} ({n}){ext_part}")
+                                n += 1
+                            try:
+                                shutil.move(fp, dest)
+                                moved += 1
+                            except OSError:
+                                skipped += 1
+                            break
+            msg = f"✅ Başarılı! {moved} dosya kategorize edildi." + (f" ({skipped} atlandı)" if skipped else "")
+            self.safe_ui_update(self.lbl_org_status.configure, text=msg, text_color="#A6E3A1")
+            beep(1000, 200)
+        except Exception as e:
+            self.safe_ui_update(self.lbl_org_status.configure, text=f"Hata: {e}", text_color="#F38BA8")
+        finally:
+            self._organizing = False
 
     def build_startup_view(self):
         self.startup_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         top = ctk.CTkFrame(self.startup_panel, corner_radius=10)
         top.pack(fill="x", pady=(0, 8))
-        ctk.CTkLabel(top, text="🚀 Windows Başlangıç Uygulamaları", font=ctk.CTkFont(size=14, weight="bold")).pack(side="left", padx=15, pady=10)
+        self.lbl_startup_title = ctk.CTkLabel(top, text=self.t("startup_title"), font=ctk.CTkFont(size=14, weight="bold"))
+        self.lbl_startup_title.pack(side="left", padx=15, pady=10)
         
         self.start_tree_frame = ctk.CTkFrame(self.startup_panel, corner_radius=10, fg_color="#181825")
         self.start_tree_frame.pack(fill="both", expand=True)
@@ -1513,7 +1690,8 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.hash_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         top = ctk.CTkFrame(self.hash_panel, corner_radius=10)
         top.pack(fill="x", pady=(0, 10))
-        ctk.CTkButton(top, text="🔍 Hash Hesaplanacak Dosyayı Seç", fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.select_hash_file).pack(side="left", padx=15, pady=12)
+        self.btn_select_hash = ctk.CTkButton(top, text=self.t("hash_btn"), fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=self.select_hash_file)
+        self.btn_select_hash.pack(side="left", padx=15, pady=12)
         self.lbl_hash_file = ctk.CTkLabel(top, text="Dosya Seçilmedi", font=ctk.CTkFont(size=12))
         self.lbl_hash_file.pack(side="left", padx=10)
         
@@ -1527,12 +1705,15 @@ class BeytarchiverV37App(TkinterDnD.Tk):
             threading.Thread(target=self.calculate_hashes, args=(selected,), daemon=True).start()
 
     def calculate_hashes(self, file_path):
-        md5, sha1, sha256 = hashlib.md5(), hashlib.sha1(), hashlib.sha256()
-        with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
-                md5.update(chunk); sha1.update(chunk); sha256.update(chunk)
-        res = f"📄 Dosya: {os.path.basename(file_path)}\n\n📌 MD5:\n{md5.hexdigest()}\n\n📌 SHA-1:\n{sha1.hexdigest()}\n\n📌 SHA-256:\n{sha256.hexdigest()}\n"
-        self.safe_ui_update(lambda: self.update_hash_box(res))
+        try:
+            md5, sha1, sha256 = hashlib.md5(), hashlib.sha1(), hashlib.sha256()
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    md5.update(chunk); sha1.update(chunk); sha256.update(chunk)
+            res = f"📄 Dosya: {os.path.basename(file_path)}\n\n📌 MD5:\n{md5.hexdigest()}\n\n📌 SHA-1:\n{sha1.hexdigest()}\n\n📌 SHA-256:\n{sha256.hexdigest()}\n"
+        except Exception as e:
+            res = f"❌ Dosya okunamadı ({os.path.basename(file_path)}):\n{e}\n"
+        self.safe_ui_update(self.update_hash_box, res)
 
     def update_hash_box(self, text):
         self.hash_box.configure(state="normal")
@@ -1544,14 +1725,16 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.settings_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         
         # Üst Başlık
-        ctk.CTkLabel(self.settings_panel, text="⚙️ " + self.t("settings"), font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(20, 10))
+        self.lbl_settings_header = ctk.CTkLabel(self.settings_panel, text="⚙️ " + self.t("settings"), font=ctk.CTkFont(size=24, weight="bold"))
+        self.lbl_settings_header.pack(pady=(20, 10))
 
         # Şık Konteyner Kutu
         settings_container = ctk.CTkFrame(self.settings_panel, fg_color="#181825", corner_radius=15, width=400)
         settings_container.pack(pady=10, padx=20, fill="y", expand=True)
         
         # Görünüm Modu
-        ctk.CTkLabel(settings_container, text=self.t("theme"), font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(30, 5))
+        self.lbl_theme_title = ctk.CTkLabel(settings_container, text=self.t("theme"), font=ctk.CTkFont(size=14, weight="bold"))
+        self.lbl_theme_title.pack(pady=(30, 5))
         self.theme_menu = ctk.CTkOptionMenu(settings_container, values=["Dark", "Light", "System"], command=self.change_appearance_mode, width=200)
         self.theme_menu.pack(pady=5, padx=50)
         # Mevcut modu ayarla
@@ -1559,17 +1742,21 @@ class BeytarchiverV37App(TkinterDnD.Tk):
         self.theme_menu.set(current_mode if current_mode in ["Dark", "Light"] else "System")
         
         # Renk Paleti
-        ctk.CTkLabel(settings_container, text=self.t("color_palette"), font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(20, 5))
+        self.lbl_palette_title = ctk.CTkLabel(settings_container, text=self.t("color_palette"), font=ctk.CTkFont(size=14, weight="bold"))
+        self.lbl_palette_title.pack(pady=(20, 5))
         self.palette_menu = ctk.CTkOptionMenu(settings_container, values=list(COLOR_THEMES.keys()), command=self.apply_color_palette, width=200)
         self.palette_menu.set(self.active_palette_name)
         self.palette_menu.pack(pady=5, padx=50)
         
         # Dil Seçimi
-        ctk.CTkLabel(settings_container, text=self.t("language"), font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(20, 5))
+        self.lbl_lang_title = ctk.CTkLabel(settings_container, text=self.t("language"), font=ctk.CTkFont(size=14, weight="bold"))
+        self.lbl_lang_title.pack(pady=(20, 5))
         self.lang_menu = ctk.CTkOptionMenu(settings_container, values=["TR", "EN"], command=self.change_language, width=200)
         self.lang_menu.set(self.current_lang)
         self.lang_menu.pack(pady=(5, 30), padx=50)
 
+BeytarchiverV37App = BeytarchiverApp
+
 if __name__ == "__main__":
-    app = BeytarchiverV37App()
+    app = BeytarchiverApp()
     app.mainloop()

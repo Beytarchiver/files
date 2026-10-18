@@ -390,6 +390,7 @@ def test_real_gui_navigation_vault_and_queue(tmp_path, monkeypatch):
     version = tmp_path / 'version'; version.write_text(app.CURRENT_VERSION)
     monkeypatch.setattr(app, 'VERSION_FILE', str(version))
     monkeypatch.setattr(app.simpledialog, 'askstring', lambda *a, **kw: 'test master password')
+    monkeypatch.setattr(app.messagebox, 'askyesno', lambda *a, **kw: True)
     window = app.BeytarchiverV37App()
     errors = []
     window.report_callback_exception = lambda *error: errors.append(error)

@@ -1,4 +1,4 @@
-#define MyAppVersion "4.0"
+#define MyAppVersion "4.0.1"
 #ifndef BuildRoot
   #define BuildRoot "."
 #endif
@@ -7,7 +7,7 @@
 AppId=Beytarchiver Pro Enterprise
 AppName=Beytarchiver Pro Enterprise
 AppVersion={#MyAppVersion}
-VersionInfoVersion=4.0.0.0
+VersionInfoVersion=4.0.1.0
 AppPublisher=Beytarchiver Inc.
 DefaultDirName={autopf}\Beytarchiver
 DefaultGroupName=Beytarchiver
