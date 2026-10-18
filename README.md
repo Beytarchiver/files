@@ -98,18 +98,16 @@ Uygulamayı doğrudan Python kaynak kodundan çalıştırmak veya geliştirmek i
 
 ```powershell
 # 1. Depoyu klonlayın ve klasöre girin
-git clone https://github.com/beytu2855/files.git
+git clone https://github.com/Beytarchiver/files.git
 cd files
 
 # 2. Sanal ortam (.venv) oluşturun ve bağımlılıkları yükleyin
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r beytarchiver-requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r scripts\beytarchiver-requirements.txt
 
 # 3. Uygulamayı başlatın
-.\.venv\Scripts\python.exe ".\venv\Akıllı_Dosya_Yöneticisi\beytarchiver.py"
+.\.venv\Scripts\python.exe .\beytarchiver.py
 ```
-
-> ⚠️ **Not:** Depo içindeki `venv/Akıllı_Dosya_Yöneticisi` klasörü projenin kaynak kodlarını barındırır; kendi sanal ortamınız için `.venv` adını kullanın.
 
 ---
 
@@ -119,28 +117,62 @@ Kaynak kodları C/makine koduna (`.pyd`) derleyip tek klasörlü `.exe` ve Inno 
 
 ```powershell
 # 1. Nuitka + PyInstaller ile korumalı dist\Beytarchiver\Beytarchiver.exe üretir
-powershell -ExecutionPolicy Bypass -File .\build_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
 
 # 2. Inno Setup ile Output\Beytarchiver_v4.0.1_Setup.exe kurulum dosyasını derler
-& "C:\Program Files\Inno Setup 7\ISCC.exe" .\setup_scriss.iss
+& "C:\Program Files\Inno Setup 7\ISCC.exe" .\scripts\setup_scriss.iss
 ```
+
+---
+
+## 📜 Sürüm Geçmişi (Changelog)
+
+### ✨ v4.0.1 *(Güncel Sürüm — 18 Ekim 2026)*
+- 🧹 **Sistem Temizleyici:** Windows Temp ve AppData Temp klasörlerinin aynı dizini işaret ettiği durumlarda oluşan çift sayım hatası giderildi.
+- 📁 **Akıllı Düzenleyici & Arşivleme:** Masaüstü/İndirilenler düzenleyicisine işlem öncesi onay penceresi eklendi, arka plan iş parçacığına (thread) taşındı ve aynı isimli dosyaların üzerine yazması (` (1)`, ` (2)` adlandırmasıyla) engellendi; arşivler artık kaynak dosyanın bulunduğu klasöre kaydediliyor.
+- ⚡ **Performans İyileştirmeleri:** Çift Dosya Bulucu önce dosya boyutuna göre ön-gruplama yaparak yalnızca aynı boyuttaki adayların SHA-256 özetini hesaplıyor; Canlı Kaynak İzleyici sekmeden çıkıldığında otomatik duraklatılıyor.
+- 🌐 **Tam TR / EN Dil Desteği:** Üst araç çubuğu, tüm alt paneller ve Telefonla Aktar modülü için eksiksiz Türkçe ve İngilizce yerelleştirme tamamlandı.
+- 🧱 **Nuitka + Inno Setup Dağıtımı:** Çekirdek modüller Nuitka ile yerel C/makine koduna (`.pyd`) derlendi ve tek tıkla kurulan `Beytarchiver_v4.0.1_Setup.exe` kurulum sihirbazı hazırlandı.
+
+### ✨ v4.0
+- 📱 **Telefonla Aktar (LAN Transfer):** Bulut veya internet kullanmadan, aynı yerel ağdaki (Wi-Fi / Ethernet) Android telefona doğrudan dosya gönderme modülü eklendi.
+- 🔗 **QR Eşleştirme & 6 Haneli Kod Onayı:** 120 saniyelik tek kullanımlık QR kodu, geçici TLS sertifikası parmak izi sabitleme (certificate pinning) ve iki ekranda 6 haneli kod karşılaştırma onayı.
+- ✅ **Uçtan Uca Doğrulama:** Aktarılan dosyalar için otomatik SHA-256 bütünlük doğrulaması ve telefondan bilgisayara kayıt alındı bildirimi (`receipt`).
+
+### ✨ v3.7 *(Ultimate Edition)*
+- 📈 **Canlı Kaynak İzleyici:** CPU ve RAM kullanım yüzdelerinin anlık grafiksel takibi eklendi.
+- 🔑 **Şifre Yöneticisi:** Ana parola (`scrypt` + `AES-256-GCM`) korumalı yerel şifre kasası, 15 saniyelik güvenli şifre gösterimi ve sekmeden çıkınca / 5 dakika hareketsizlikte otomatik kilitleme.
+- 🛡️ **Arşiv ve Silme Güvenliği:** ZIP/TAR/7z çıkartmada Path Traversal (`../`), sembolik bağlantı ve zip bombası korumaları; 3 geçişli güvenli dosya silme (`overwrite_and_delete`).
+- 🛠️ **Thread-Safe UI Queue:** Arka plan taramalarının Tkinter arayüzünü dondurmasını veya çökertmesini önleyen kuyruk mimarisi.
+
+### ✨ v3.5 *(Logo & Visual Upgrade)*
+- 🖼️ **Logo ve İkon Entegrasyonu:** Uygulama içi üst araç çubuğu logosu ve Windows pencere/görev çubuğu ikonu (`logo.ico` / `logo.png`) eklendi.
+- 🎨 **11 Renk Paleti & Görünüm Modu:** *Catppuccin, Emerald, Cyberpunk, Nordic, Dracula, Sunset* dahil 11 özel renk teması ve Koyu/Açık/Sistem görünüm modu senkronizasyonu.
+- 🔐 **Gizli Kasa (`.beyt`):** AES-256 şifreli özel `.beyt` kasa oluşturma ve çıkartma desteği.
+- ⚡ **Bellek Azaltıcı & Yazılım Güncelleyici:** Çalışma kümesi (`EmptyWorkingSet`) bellek azaltıcı ve `winget` tabanlı eski yazılım tarayıcısı.
+
+### ✨ v3.0, v2.5 & v2.0 *(Temel Sistem & Güvenlik Araçları)*
+- 📦 **Çoklu Arşiv Motoru:** Sürükle-bırak destekli `ZIP`, `7z`, `TAR`, `GZ` sıkıştırma ve arşiv çıkartma.
+- 👥 **Çift Dosya Bulucu & Disk Analizi:** Klasörlerdeki en büyük 50 dosyayı listeleme veSHA-256 tabanlı kopya dosya tespiti.
+- 🛡️ **Yerel Dosya Kontrolü & Hash Hesaplayıcı:** `MD5`, `SHA-1`, `SHA-256` özet hesaplama, gizlenmiş çift uzantı (`.pdf.exe`) tespiti ve EICAR test imzası kontrolü.
+- 🚀 **Başlangıç Yöneticisi:** Windows başlangıcında otomatik çalışan uygulamaları (`HKCU\...\Run`) görüntüleme.
 
 ---
 
 ## 🇬🇧 English Installation Guide
 
 ### 1. Install via Windows Setup Wizard *(Recommended)*
-1. Go to **[GitHub Releases](https://github.com/beytu2855/files/releases/latest)** and download **`Beytarchiver_v4.0.1_Setup.exe`**.
+1. Go to **[GitHub Releases](https://github.com/Beytarchiver/files/releases/latest)** and download **`Beytarchiver_v4.0.1_Setup.exe`**.
 2. Run the installer. If Windows SmartScreen appears, click **More info → Run anyway** (as long as you downloaded it from the official GitHub repository).
 3. Follow the setup wizard steps and launch **Beytarchiver Pro**. You can switch the interface language to **EN** anytime from the **⚙️ Settings** tab.
 
 ### 2. Run from Source (Python 3.10+)
 ```powershell
-git clone https://github.com/beytu2855/files.git
+git clone https://github.com/Beytarchiver/files.git
 cd files
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r beytarchiver-requirements.txt
-.\.venv\Scripts\python.exe ".\venv\Akıllı_Dosya_Yöneticisi\beytarchiver.py"
+.\.venv\Scripts\python.exe -m pip install -r scripts\beytarchiver-requirements.txt
+.\.venv\Scripts\python.exe .\beytarchiver.py
 ```
 
 ---
