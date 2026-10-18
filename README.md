@@ -3,7 +3,7 @@
   <h1>Beytarchiver v4.0.1</h1>
   <p><strong>Windows için Hepsi Bir Arada Arşivleme, Şifreli Kasa, Sistem Temizliği ve Telefona Dosya Aktarım Aracı</strong></p>
   <p>
-    <a href="https://beytu2855.github.io/files/">🌐 Resmi Web Sitesi</a> ·
+    <a href="https://beytarchiver.github.io/">🌐 Resmi Web Sitesi</a> ·
     <a href="https://github.com/beytu2855/files/releases/latest">⬇️ Windows İçin İndir (v4.0.1)</a> ·
     <a href="#-kurulum-rehberi">📖 Kurulum Rehberi</a> ·
     <a href="#-english-installation-guide">🇬🇧 English Guide</a>
