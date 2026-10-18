@@ -1,4 +1,4 @@
-# Beytarchiver 4.0
+# Beytarchiver 4.0.1
 
 Python 3.10 veya üzeri ve Tkinter gerekir. Windows sistem araçları (winget,
 kayıt defteri, RAM temizleme ve geri dönüşüm kutusu) Windows'a özeldir.
