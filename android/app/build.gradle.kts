@@ -25,7 +25,7 @@ android {
         unitTests.isReturnDefaultValues = false
         unitTests.all { it.workingDir = rootProject.projectDir.parentFile }
     }
-    sourceSets["test"].resources.srcDir("../../protocol")
+    sourceSets["test"].resources.srcDir("../../tests/protocol")
 }
 
 dependencies {

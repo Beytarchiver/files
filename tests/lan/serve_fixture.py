@@ -9,7 +9,7 @@ import sys
 import tempfile
 import threading
 
-sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'venv/Akıllı_Dosya_Yöneticisi'))
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
 from lan_transfer.server import TransferServer
 
 

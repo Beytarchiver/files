@@ -16,7 +16,7 @@ import zipfile
 import pytest
 
 
-SOURCE = Path(__file__).parents[1] / 'venv/AkÃ„Â±llÃ„Â±_Dosya_YÃƒÂ¶neticisi/beytarchiver.py'
+SOURCE = Path(__file__).parents[1] / 'beytarchiver.py'
 sys.path.insert(0, str(SOURCE.parent))
 spec = importlib.util.spec_from_file_location('beytarchiver', SOURCE)
 app = importlib.util.module_from_spec(spec)
@@ -87,13 +87,13 @@ def test_antivirus_detects_disguised_executable(tmp_path):
     path = tmp_path / 'rapor.pdf.exe'
     path.write_bytes(b'not executed')
     results, _ = app.BeytNativeAntivirus().scan_file(str(path))
-    assert any('ÃƒÂ§ift uzantÃ„Â±' in result for result in results)
+    assert any('çift uzantı' in result for result in results)
 
 
 def test_antivirus_reports_unreadable_file_instead_of_clean(tmp_path):
     results, digest = app.BeytNativeAntivirus().scan_file(str(tmp_path / 'missing'))
     assert digest is None
-    assert any('okunamadÃ„Â±' in result.lower() for result in results)
+    assert any('okunamadı' in result.lower() for result in results)
 
 
 @pytest.mark.parametrize('kind', ['zip', 'beyt', '7z', 'tar', 'tar.gz', 'gz'])
@@ -377,7 +377,7 @@ def test_compression_worker_round_trip(tmp_path, monkeypatch, kind):
                              finish_compression=Mock(), safe_ui_update=lambda f, *a, **kw: f(*a, **kw))
     password = '' if kind == 'tar' else ' password with spaces '
     app.BeytarchiverV37App.compress_engine(target, (str(source),), kind, password)
-    assert statuses[-1].startswith('SÃ„Â±kÃ„Â±Ã…Å¸tÃ„Â±rma BaÃ…Å¸arÃ„Â±lÃ„Â±:')
+    assert statuses[-1].startswith('Sıkıştırma Başarılı:')
     archive = next(tmp_path.glob('beyt_archive_*.' + kind))
     app.safe_extract_archive(archive, tmp_path / 'out', password)
     assert (tmp_path / 'out/hello.txt').read_bytes() == source.read_bytes()
@@ -407,7 +407,7 @@ def test_real_gui_navigation_vault_and_queue(tmp_path, monkeypatch):
         window.ent_pass.insert(0, 'different password')
         window.save_password()
         row = window.pass_tree.get_children()[0]
-        assert str(window.pass_tree.item(row)['values'][1]) == 'Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢'
+        assert str(window.pass_tree.item(row)['values'][1]) == '••••••••'
         window.pass_tree.selection_set(row)
         window.reveal_password()
         assert window.pass_tree.item(row)['values'][1] == ' secret with spaces '

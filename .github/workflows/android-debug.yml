@@ -5,18 +5,18 @@ on:
   push:
     paths:
       - 'android/**'
-      - 'protocol/**'
       - 'tests/**'
-      - 'venv/Akıllı_Dosya_Yöneticisi/**'
-      - 'beytarchiver-requirements.txt'
+      - 'beytarchiver.py'
+      - 'lan_transfer/**'
+      - 'scripts/beytarchiver-requirements.txt'
       - '.github/workflows/android-debug.yml'
   pull_request:
     paths:
       - 'android/**'
-      - 'protocol/**'
       - 'tests/**'
-      - 'venv/Akıllı_Dosya_Yöneticisi/**'
-      - 'beytarchiver-requirements.txt'
+      - 'beytarchiver.py'
+      - 'lan_transfer/**'
+      - 'scripts/beytarchiver-requirements.txt'
       - '.github/workflows/android-debug.yml'
 
 permissions:
@@ -47,7 +47,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: beytarchiver-requirements.txt
+          cache-dependency-path: scripts/beytarchiver-requirements.txt
       - name: Set up Gradle and validate wrapper
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
@@ -60,7 +60,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;34.0.0"
           sudo apt-get update
           sudo apt-get install -y xvfb xauth python3-tk
-          python -m pip install -r beytarchiver-requirements.txt pytest==9.1.1
+          python -m pip install -r scripts/beytarchiver-requirements.txt pytest==9.1.1
       - name: Python regression tests including Tk
         run: xvfb-run -a python -m pytest -q
       - name: Android tests, lint and APK

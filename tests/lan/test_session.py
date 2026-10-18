@@ -8,7 +8,7 @@ from conftest import pair_request
 
 
 def test_shared_qr_fixtures(modules):
-    fixtures = json.loads((Path(__file__).parents[2] / 'protocol/lan-v1-fixtures.json').read_text())
+    fixtures = json.loads((Path(__file__).parents[1] / 'protocol/lan-v1-fixtures.json').read_text())
     validate = modules[2]
     for example in fixtures:
         if example['valid']:

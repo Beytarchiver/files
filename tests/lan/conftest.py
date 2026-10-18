@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-SOURCE = Path(__file__).resolve().parents[2] / 'venv/Akıllı_Dosya_Yöneticisi'
+SOURCE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SOURCE))
 
 

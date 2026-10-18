@@ -106,7 +106,7 @@ def test_panel_worker_dispatch_and_duplicate_start(monkeypatch):
 @pytest.mark.skipif(not os.environ.get('DISPLAY'), reason='Requires a graphical display')
 def test_main_window_contains_transfer_panel_and_shuts_it_down(tmp_path, monkeypatch):
     panel_module()
-    source=Path(__file__).parents[2]/'venv/Akıllı_Dosya_Yöneticisi/beytarchiver.py'
+    source=Path(__file__).parents[2]/'beytarchiver.py'
     spec=importlib.util.spec_from_file_location('beyt_lan_gui',source)
     app=importlib.util.module_from_spec(spec); spec.loader.exec_module(app)
     monkeypatch.setattr(app.Path,'home',lambda:tmp_path)
