@@ -283,6 +283,23 @@
     <img id="lightboxImg" src="" alt="">
   </dialog>
 
+  <div id="maintenanceOverlay" class="maint-overlay" hidden aria-live="polite">
+    <div class="maint-card">
+      <div class="maint-logo-wrap">
+        <img src="assets/logo.png" alt="Beytarchiver" width="76" height="76">
+        <span class="maint-gear" aria-hidden="true">⚙️</span>
+      </div>
+      <p class="pill maint-pill"><span class="dot"></span> <span data-i18n="maintBadge">Geliştirici şu anda VS Code üzerinde aktif</span></p>
+      <h2 data-i18n="maintTitle">🛠️ Bakım &amp; Güncelleme Yapılıyor...</h2>
+      <p class="maint-desc" data-i18n="maintDesc">Beytarchiver için şu anda kod düzenlemesi ve yeni sürüm hazırlığı yapılıyor. Kısa süre içinde yeni özelliklerle tekrar yayında olacağız!</p>
+      <div class="maint-progress" aria-hidden="true"><span></span></div>
+      <div class="maint-actions">
+        <a class="btn btn-primary" href="https://github.com/beytu2855/files/releases/download/v4.0.1/Beytarchiver_v4.0.1_Setup.exe" data-i18n="maintDownload">⬇️ Mevcut Kararlı Sürümü İndir (v4.0.1)</a>
+        <button type="button" class="btn btn-ghost" id="maintDismiss" data-i18n="maintPreview">Siteyi Yine de Görüntüle</button>
+      </div>
+    </div>
+  </div>
+
   <script src="main.js" defer></script>
 </body>
 </html>

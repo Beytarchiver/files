@@ -784,3 +784,111 @@ dialog#lightbox img {
     display: none;
   }
 }
+
+/* MAINTENANCE OVERLAY */
+.maint-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(17, 17, 27, 0.88);
+  backdrop-filter: blur(18px);
+}
+
+.maint-overlay[hidden] {
+  display: none;
+}
+
+.maint-card {
+  width: min(560px, 100%);
+  background: linear-gradient(165deg, #1e1e2e, #181825);
+  border: 1px solid rgba(137, 180, 250, 0.35);
+  border-radius: 22px;
+  padding: 38px 32px;
+  text-align: center;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
+}
+
+.maint-logo-wrap {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 18px;
+}
+
+.maint-logo-wrap img {
+  margin: 0 auto;
+}
+
+.maint-gear {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  font-size: 1.55rem;
+  display: inline-block;
+  animation: maint-spin 4s linear infinite;
+}
+
+@keyframes maint-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.maint-pill {
+  background: rgba(249, 226, 175, 0.14);
+  border-color: rgba(249, 226, 175, 0.4);
+  color: #f9e2af;
+}
+
+.maint-pill .dot {
+  background: #f9e2af;
+  box-shadow: 0 0 10px #f9e2af;
+}
+
+.maint-card h2 {
+  font-size: clamp(1.45rem, 2.8vw, 1.9rem);
+  margin: 4px 0 12px;
+}
+
+.maint-desc {
+  color: var(--muted);
+  margin: 0 0 22px;
+  font-size: 0.98rem;
+}
+
+.maint-progress {
+  height: 8px;
+  border-radius: 99px;
+  background: #313244;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.maint-progress span {
+  display: block;
+  width: 45%;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  animation: maint-slide 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes maint-slide {
+  from {
+    transform: translateX(-10%);
+  }
+  to {
+    transform: translateX(130%);
+  }
+}
+
+.maint-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+

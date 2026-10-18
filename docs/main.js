@@ -120,7 +120,12 @@ const I18N = {
     footerReleases: "Sürümler",
     footerIssues: "Hata Bildir",
     lbLabel: "Ekran görüntüsü",
-    close: "Kapat"
+    close: "Kapat",
+    maintBadge: "Geliştirici şu anda VS Code üzerinde aktif",
+    maintTitle: "🛠️ Bakım & Güncelleme Yapılıyor...",
+    maintDesc: "Beytarchiver için şu anda kod düzenlemesi ve yeni sürüm hazırlığı yapılıyor. Kısa süre içinde yeni özelliklerle tekrar yayında olacağız!",
+    maintDownload: "⬇️ Mevcut Kararlı Sürümü İndir (v4.0.1)",
+    maintPreview: "Siteyi Yine de Görüntüle"
   },
   en: {
     skip: "Skip to content",
@@ -243,7 +248,12 @@ const I18N = {
     footerReleases: "Releases",
     footerIssues: "Report Issue",
     lbLabel: "Screenshot preview",
-    close: "Close"
+    close: "Close",
+    maintBadge: "Developer is currently active in VS Code",
+    maintTitle: "🛠️ Maintenance & Update in Progress...",
+    maintDesc: "We are actively editing code and preparing a new Beytarchiver release. The website will be back shortly with new features!",
+    maintDownload: "⬇️ Download Current Stable Release (v4.0.1)",
+    maintPreview: "View Site Anyway"
   }
 };
 
@@ -319,4 +329,47 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
   }
+
+  // Live maintenance mode check (instant via GitHub raw API + local status.json fallback)
+  const overlay = document.getElementById("maintenanceOverlay");
+  const dismissBtn = document.getElementById("maintDismiss");
+  let userDismissed = false;
+
+  if (dismissBtn && overlay) {
+    dismissBtn.addEventListener("click", () => {
+      userDismissed = true;
+      overlay.hidden = true;
+    });
+  }
+
+  async function checkMaintenance() {
+    if (!overlay) return;
+    let data = null;
+    try {
+      const res = await fetch(
+        "https://api.github.com/repos/Beytarchiver/beytarchiver.github.io/contents/status.json?t=" + Date.now(),
+        { headers: { Accept: "application/vnd.github.raw+json" }, cache: "no-store" }
+      );
+      if (res.ok) data = await res.json();
+    } catch (e) {}
+
+    if (!data) {
+      try {
+        const res2 = await fetch("status.json?t=" + Date.now(), { cache: "no-store" });
+        if (res2.ok) data = await res2.json();
+      } catch (e) {}
+    }
+
+    if (data && typeof data.maintenance === "boolean") {
+      if (!data.maintenance) {
+        userDismissed = false;
+        overlay.hidden = true;
+      } else if (!userDismissed) {
+        overlay.hidden = false;
+      }
+    }
+  }
+
+  checkMaintenance();
+  setInterval(checkMaintenance, 15000);
 });
