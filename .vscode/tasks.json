@@ -9,7 +9,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/set_maintenance.ps1",
+        "${workspaceFolder}/scripts/set_maintenance.ps1",
         "-State",
         "auto"
       ],
@@ -31,7 +31,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/set_maintenance.ps1",
+        "${workspaceFolder}/scripts/set_maintenance.ps1",
         "-State",
         "on"
       ],
@@ -45,7 +45,7 @@
         "-ExecutionPolicy",
         "Bypass",
         "-File",
-        "${workspaceFolder}/set_maintenance.ps1",
+        "${workspaceFolder}/scripts/set_maintenance.ps1",
         "-State",
         "off"
       ],

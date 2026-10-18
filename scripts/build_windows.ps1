@@ -1,11 +1,11 @@
 $ErrorActionPreference = 'Stop'
-Set-Location $PSScriptRoot
+$RepoRoot = Split-Path -Parent $RepoRoot; Set-Location $RepoRoot
 
 if ($env:OS -ne 'Windows_NT') {
     throw 'Run this build on Windows.'
 }
 
-$Python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
+$Python = Join-Path $RepoRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path $Python)) {
     if (Get-Command py -ErrorAction SilentlyContinue) {
         & py -3 -m venv .venv
@@ -15,14 +15,14 @@ if (-not (Test-Path $Python)) {
     if ($LASTEXITCODE -ne 0) { throw 'Python virtual environment creation failed.' }
 }
 
-& $Python -m pip install -r beytarchiver-requirements.txt 'pyinstaller==6.22.3' 'nuitka==4.3.1'
+& $Python -m pip install -r scripts\beytarchiver-requirements.txt 'pyinstaller==6.22.3' 'nuitka==4.3.1'
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
 
-$NuitkaDir = Join-Path $PSScriptRoot 'build\nuitka_mod'
+$NuitkaDir = Join-Path $RepoRoot 'build\nuitka_mod'
 if (Test-Path $NuitkaDir) { Remove-Item -Recurse -Force $NuitkaDir }
 New-Item -ItemType Directory -Force -Path $NuitkaDir | Out-Null
 
-$AppDir = (Resolve-Path (Join-Path $PSScriptRoot 'venv\Ak*')).Path
+$AppDir = if (Test-Path (Join-Path $RepoRoot "beytarchiver.py")) { $RepoRoot } elseif (Test-Path (Join-Path $RepoRoot "app\beytarchiver.py")) { Join-Path $RepoRoot "app" } else { (Resolve-Path (Join-Path $RepoRoot "venv\Ak*")).Path }
 Push-Location $AppDir
 try {
     & $Python -m nuitka --mode=module beytarchiver.py `

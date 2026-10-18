@@ -1,5 +1,5 @@
 {
-  "maintenance": false,
-  "target_version": "4.0.2",
-  "updated_at": "2026-10-18T19:54:00+03:00"
+    "target_version":  "4.0.2",
+    "maintenance":  true,
+    "updated_at":  "2026-10-18T20:40:21.7411046+03:00"
 }

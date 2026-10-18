@@ -4,7 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = $PSScriptRoot
+$RepoRoot = Split-Path -Parent $PSScriptRoot
 $StatusFile = Join-Path $RepoRoot "docs\status.json"
 
 function Get-GitHubToken {
