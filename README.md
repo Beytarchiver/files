@@ -49,8 +49,8 @@ Bilgisayardan Android telefona (Android 8.0 / API 26 ve üzeri) bulut kullanmada
 
 #### A) Android APK Kurulumu
 1. Depoda **[Actions → Android debug APK](https://github.com/beytu2855/files/actions)** sekmesini açın ve en son başarılı (yeşil) derlemeye tıklayın *(veya Releases sayfasına eklenen APK'yı indirin)*.
-2. **Artifacts** bölümünden `beytarchiver-android-4.0.0-alpha.1-...` ZIP paketini indirip açın.
-3. İçindeki `Beytarchiver-4.0.0-alpha.1-debug.apk` dosyasını telefonunuza aktarın ve açarak kurun (tarayıcı/dosya yöneticisi için *“Bilinmeyen kaynaklardan uygulama yükleme”* iznini onaylayın).
+2. **Artifacts** bölümünden `beytarchiver-android-4.0.1-...` ZIP paketini indirip açın.
+3. İçindeki `Beytarchiver-4.0.1-debug.apk` dosyasını telefonunuza aktarın ve açarak kurun (tarayıcı/dosya yöneticisi için *“Bilinmeyen kaynaklardan uygulama yükleme”* iznini onaylayın).
 
 #### B) Bilgisayardan Telefona İlk Aktarım Adımları
 1. **Aynı Ağ:** Bilgisayarınızın ve telefonunuzun aynı yerel ağda (aynı Wi-Fi veya aynı modeme bağlı Ethernet) olduğundan emin olun. *(Misafir Wi-Fi veya açık VPN bağlantıyı engelleyebilir.)*
