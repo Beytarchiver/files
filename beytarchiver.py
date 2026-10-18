@@ -435,8 +435,44 @@ LANGUAGES = {
         "org_downloads": "📥 İndirilenler Klasörünü Düzenle",
         "startup_title": "🚀 Windows Başlangıç Uygulamaları",
         "hash_btn": "🔍 Hash Hesaplanacak Dosyayı Seç",
-        "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Ultimate Raporu",
-        "update_notes": "📌 SÜRÜM GELİŞİM GEÇMİŞİ:\n\n✨ v4.0.1:\n• 🧹 TEMİZLEYİCİ: Windows Temp ve AppData Temp çift sayım hatası giderildi.\n• 📁 DÜZENLEYİCİ & ARŞİV: Onaylı arka plan düzenleme ve kaynak klasöre arşiv çıktısı.\n• ⚡ PERFORMANS: Boyut ön-gruplamalı hızlı çift dosya taraması ve sekme bazlı izleyici.\n• 🌐 ÇEVİRİ: Araç çubuğu, paneller ve Telefonla Aktar TR/EN dil desteği tamamlandı.\n\n✨ v4.0:\n• 📱 TELEFONLA AKTAR: Aynı yerel ağda Android telefona dosya gönderme.\n• 🔗 QR ile eşleştirme, altı haneli kod onayı ve TLS bağlantısı.\n• ✅ SHA-256 doğrulaması ve telefondan kayıt onayı.\n• 🧪 Android istemcisi alpha aşamasında; aktarım sırasında açık tutulmalıdır.\n\n✨ v3.7 (Ultimate Edition):\n• 📈 CANLI İZLEYİCİ: CPU ve RAM kullanımı anlık takibi eklendi.\n• 🔑 ŞİFRE YÖNETİCİSİ: Ana parolalı AES-256-GCM kasa ve otomatik kilitleme.\n• 🛠️ AV OPTİMİZASYONU: False-Positive (Yanlış Alarm) uyarıları azaltıldı.\n• 🛡️ Dosya Silme: Onaylı, parçalı üç geçişli üzerine yazma; SSD silme garantisi yoktur.\n• 🛠️ UI Stability: UI Queue (Kuyruk) mimarisi ile Thread-Safe yapıldı.\n\n✨ v3.5 (Logo & Visual Upgrade):\n• 🖼️ Arayüz içi ve Pencere İkonu (Logo) desteği eklendi.\n• 🎨 Görünüm Modu (Dark/Light/System) ve 11 Renk Teması senkronize edildi.\n• 🔐 Gizli Kasa (.beyt): AES-256 şifreli kasa oluşturma desteği.\n• ⚡ Bellek Azaltıcı & winget entegrasyonlu Yazılım Güncelleyici.\n\n✨ v3.0, v2.5 & v2.0:\n• 📦 Çoklu Arşivleme (ZIP, 7z, TAR, GZ) ve Sürükle-Bırak desteği.\n• 👥 Çift Dosya Bulucu, Disk Analizi, Güvenli Silici (Shredder), Hash & Başlangıç Yöneticisi.",
+        "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Güncelleme Raporu",
+        "update_notes": (
+            "📌 SÜRÜM GELİŞİM GEÇMİŞİ (v1.0 ➔ v4.0.1)\n"
+            "══════════════════════════════════════════════════════════\n\n"
+            "✨ v4.0.1 (Güncel Sürüm — 18 Ekim 2026):\n"
+            "• 🧹 SİSTEM TEMİZLEYİCİ: Windows Temp ve AppData Temp klasörlerinin aynı dizini işaret ettiği durumlarda oluşan çift sayım hatası tamamen giderildi.\n"
+            "• 📁 AKILLI DÜZENLEYİCİ: Masaüstü ve İndirilenler düzenleyicisine onay penceresi eklendi, işlem arka plan iş parçacığına taşındı ve aynı isimli dosyaların üzerine yazılması engellendi.\n"
+            "• 📦 ARŞİVLEME: Arşiv dosyaları artık doğrudan kaynak dosyanın bulunduğu klasörün yanına kaydediliyor.\n"
+            "• ⚡ PERFORMANS: Çift Dosya Bulucu boyuta göre ön-gruplama ile hızlandırıldı; Canlı Kaynak İzleyici sekme değiştiğinde otomatik duraklatılarak CPU tasarrufu sağlandı.\n"
+            "• 🌐 ÇEVİRİ: Üst araç çubuğu, tüm alt paneller ve Telefonla Aktar modülü için eksiksiz TR/EN dil desteği tamamlandı.\n"
+            "• 🧱 DAĞITIM: Nuitka yerel C derlemesi ve Inno Setup kurulum sihirbazı paketi hazırlandı.\n\n"
+            "✨ v4.0 (LAN Transfer & Android Desteği):\n"
+            "• 📱 TELEFONLA AKTAR: İnternete veya buluta ihtiyaç duymadan, aynı yerel ağdaki Android telefona doğrudan dosya aktarımı.\n"
+            "• 🔗 GÜVENLİ EŞLEŞTİRME: 120 saniyede yenilenen QR kod, geçici TLS sertifikası sabitleme (certificate pinning) ve 6 haneli kod doğrulama.\n"
+            "• ✅ UÇTAN UCA DOĞRULAMA: Aktarılan dosyada SHA-256 bütünlük kontrolü ve telefondan bilgisayara kayıt alındı onayı (receipt).\n\n"
+            "✨ v3.7 (Ultimate Edition & Kararlılık):\n"
+            "• 📈 CANLI İZLEYİCİ: Gerçek zamanlı grafiksel CPU ve RAM kullanım takibi.\n"
+            "• 🔑 ŞİFRE YÖNETİCİSİ: scrypt + AES-256-GCM ile şifrelenen yerel kasa, 15 saniye şifre gösterimi ve sekmeden çıkınca otomatik kilitleme.\n"
+            "• 🛡️ GÜVENLİ ÇIKARTMA: ZIP, 7z ve TAR arşivlerinde Path Traversal (../), sembolik link ve zip bombası korumaları.\n"
+            "• 🔥 GÜVENLİ SİLİCİ (SHREDDER): Dosya üzerine 3 geçişli rastgele bayt yazarak kalıcı imha.\n"
+            "• 🛠️ THREAD-SAFE UI QUEUE: Arka plan işlerinin arayüzü kilitlemesini ve çökmesini engelleyen kuyruk mimarisi.\n\n"
+            "✨ v3.5 (Görsel Yenilikler & Özel Temalar):\n"
+            "• 🖼️ LOGO & İKON: Yeni uygulama logosu ve Windows görev çubuğu / pencere ikonu entegrasyonu.\n"
+            "• 🎨 11 RENK TEMASI: Catppuccin, Emerald, Cyberpunk, Nordic, Dracula, Sunset dahil 11 özel renk paleti ve Koyu/Açık mod uyumu.\n"
+            "• 🔐 GİZLİ KASA (.beyt): Hassas dosyaları şifreleyerek tek bir güvenli .beyt kasasında saklama desteği.\n"
+            "• ⚡ BELLEK AZALTICI: Uygulama çalışma kümesini tek tıkla boşaltma (EmptyWorkingSet).\n"
+            "• 🔄 GÜNCELLEYİCİ: Windows Package Manager (winget) entegrasyonuyla eski yazılımları tarama.\n\n"
+            "✨ v3.0 (Performans & Gelişmiş Araçlar):\n"
+            "• 👥 ÇİFT DOSYA BULUCU: MD5 ve SHA-256 imzalarıyla yinelenen dosyaları tespit etme.\n"
+            "• 📊 DİSK ANALİZİ: Seçilen klasördeki en büyük 50 dosyayı boyutuna göre listeleme.\n"
+            "• 🚀 BAŞLANGIÇ YÖNETİCİSİ: Windows başlangıcında otomatik çalışan uygulamaları görüntüleme.\n\n"
+            "✨ v2.5 & v2.0 (Güvenlik & Çoklu Format):\n"
+            "• 📦 ÇOKLU ARŞİV: ZIP, 7z, TAR, GZ formatlarında sıkıştırma ve çıkarma motoru.\n"
+            "• 🛡️ YEREL DOSYA KONTROLÜ: Şüpheli çift uzantıları (.pdf.exe) ve test imzalarını tespit eden sezgisel analiz motoru.\n"
+            "• 🧮 HASH HESAPLAYICI: MD5, SHA-1 ve SHA-256 özetlerini tek tıkla çıkarma.\n\n"
+            "✨ v1.0 (İlk Temel Sürüm):\n"
+            "• Temel dosya arşivleme, modern Tkinter kullanıcı arayüzü ve ilk masaüstü yöneticisi mimarisi."
+        ),
         "btn_close_update": "Harika, Başlayalım! 🚀"
     },
     "EN": {
@@ -474,8 +510,44 @@ LANGUAGES = {
         "org_downloads": "📥 Organize Downloads",
         "startup_title": "🚀 Windows Startup Applications",
         "hash_btn": "🔍 Select File to Calculate Hash",
-        "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Ultimate Changelog",
-        "update_notes": "📌 VERSION CHANGELOG:\n\n✨ v4.0.1:\n• 🧹 CLEANER: Fixed duplicate counting between Windows Temp and AppData Temp.\n• 📁 ORGANIZER & ARCHIVE: Confirmed background organizer and source-folder archive output.\n• ⚡ PERFORMANCE: Size-grouped fast duplicate scanner and tab-scoped resource monitor.\n• 🌐 TRANSLATION: Full TR/EN localization across toolbar, panels, and Phone Transfer.\n\n✨ v4.0:\n• 📱 PHONE TRANSFER: Send files to Android on the same local network.\n• 🔗 QR pairing, six-digit code approval and TLS connection.\n• ✅ SHA-256 verification and saved-file acknowledgement.\n• 🧪 Android client is in alpha; keep it open during transfers.\n\n✨ v3.7 (Ultimate Edition):\n• 📈 LIVE MONITOR: Real-time CPU and RAM tracking.\n• 🔑 PASSWORD MANAGER: Master-password protected AES-256-GCM kasa and automatic locking.\n• 🛠️ AV OPTIMIZATION: Reduced false-positive warnings.\n• 🛡️ File Removal: Confirmed, chunked three-pass overwrite; no SSD erasure guarantee.\n• 🛠️ UI Stability: Full Thread-Safe UI Queue implemented.\n\n✨ v3.5 (Logo & Visual Upgrade):\n• 🖼️ Window Icon & In-App Logo integration.\n• 🎨 Synchronized Appearance Mode (Dark/Light/System) and 11 Color Palettes.\n• 🔐 Encrypted Vault (.beyt): AES-256 protected vault creation.\n• ⚡ Memory Trimmer & winget Software Updater integration.\n\n✨ v3.0, v2.5 & v2.0:\n• 📦 Multi-format Archiver (ZIP, 7z, TAR, GZ) with Drag & Drop.\n• 👥 Duplicate Finder, Disk Analyzer, File Shredder, Hash & Startup Manager.",
+        "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Changelog",
+        "update_notes": (
+            "📌 VERSION CHANGELOG (v1.0 ➔ v4.0.1)\n"
+            "══════════════════════════════════════════════════════════\n\n"
+            "✨ v4.0.1 (Current Release — October 18, 2026):\n"
+            "• 🧹 SYSTEM CLEANER: Fixed duplicate counting between Windows Temp and AppData Temp when paths overlap.\n"
+            "• 📁 SMART ORGANIZER: Added confirmation prompt, background worker thread, and safe duplicate renaming ( (1), (2)).\n"
+            "• 📦 ARCHIVING: Archives now output directly next to the source folder.\n"
+            "• ⚡ PERFORMANCE: Size-grouped duplicate scanner for faster scans; tab-scoped Resource Monitor pauses in background.\n"
+            "• 🌐 LOCALIZATION: Full Turkish & English bilingual translation across toolbar, panels, and Phone Transfer.\n"
+            "• 🧱 DISTRIBUTION: Native C compilation via Nuitka and one-click Inno Setup installer package.\n\n"
+            "✨ v4.0 (LAN Transfer & Android Client):\n"
+            "• 📱 PHONE TRANSFER: Direct PC-to-Android file transfer over local network without cloud servers or accounts.\n"
+            "• 🔗 SECURE PAIRING: 120-second rotating QR code, ephemeral TLS certificate pinning, and 6-digit verification code.\n"
+            "• ✅ INTEGRITY VERIFICATION: End-to-end SHA-256 verification and client delivery receipt acknowledgement.\n\n"
+            "✨ v3.7 (Ultimate Edition & Hardened Security):\n"
+            "• 📈 RESOURCE MONITOR: Live CPU and RAM usage tracking.\n"
+            "• 🔑 PASSWORD MANAGER: Master-password protected (scrypt + AES-256-GCM) vault with 15-second reveal and auto-lock.\n"
+            "• 🛡️ HARDENED EXTRACTION: Path Traversal (../), symlink, and zip-bomb rejection across ZIP, 7z, and TAR.\n"
+            "• 🔥 FILE SHREDDER: 3-pass secure overwrite and delete engine.\n"
+            "• 🛠️ THREAD-SAFE UI QUEUE: Eliminates Tkinter race conditions and freezes during intensive scans.\n\n"
+            "✨ v3.5 (Visuals & Custom Themes):\n"
+            "• 🖼️ LOGO & ICONS: In-app brand logo and Windows taskbar / title bar icon integration.\n"
+            "• 🎨 11 COLOR THEMES: Catppuccin, Emerald, Cyberpunk, Nordic, Dracula, Sunset palettes with Dark/Light modes.\n"
+            "• 🔐 ENCRYPTED VAULT (.beyt): AES-256 encrypted multi-file container creation and extraction.\n"
+            "• ⚡ MEMORY TRIMMER: Working set reduction (EmptyWorkingSet) with single click.\n"
+            "• 🔄 SOFTWARE UPDATER: Integrated winget engine for outdated software scans.\n\n"
+            "✨ v3.0 (Performance & Advanced Utilities):\n"
+            "• 👥 DUPLICATE FINDER: MD5 and SHA-256 duplicate file detector.\n"
+            "• 📊 DISK ANALYZER: Identifies top 50 largest files in any folder or drive.\n"
+            "• 🚀 STARTUP MANAGER: Lists Windows startup registry entries.\n\n"
+            "✨ v2.5 & v2.0 (Multi-Format & Security Engines):\n"
+            "• 📦 MULTI-ARCHIVE: ZIP, 7z, TAR, GZ compression and decompression engines with Drag & Drop.\n"
+            "• 🛡️ FILE CHECK: Heuristic engine detecting masked extensions (.pdf.exe) and test signatures.\n"
+            "• 🧮 HASH CALCULATOR: Instant MD5, SHA-1, and SHA-256 calculation.\n\n"
+            "✨ v1.0 (Initial Release):\n"
+            "• Core file archiving, modern Tkinter GUI, and foundational desktop manager framework."
+        ),
         "btn_close_update": "Awesome, Let's Go! 🚀"
     }
 }
@@ -661,17 +733,17 @@ class BeytarchiverApp(TkinterDnD.Tk):
 
     def show_update_notes_dialog(self):
         dialog = ctk.CTkToplevel(self)
-        dialog.title("Beytarchiver Güncelleme Raporu")
-        dialog.geometry("560x440")
-        dialog.resizable(False, False)
+        dialog.title(self.t("update_title"))
+        dialog.geometry("720x560")
+        dialog.minsize(600, 480)
         dialog.transient(self)
         dialog.grab_set()
 
-        lbl_title = ctk.CTkLabel(dialog, text=self.t("update_title"), font=ctk.CTkFont(size=18, weight="bold"), text_color="#89B4FA")
+        lbl_title = ctk.CTkLabel(dialog, text=self.t("update_title"), font=ctk.CTkFont(size=20, weight="bold"), text_color="#89B4FA")
         lbl_title.pack(pady=(20, 10))
 
-        txt_box = ctk.CTkTextbox(dialog, width=500, height=260, corner_radius=10)
-        txt_box.pack(pady=10, padx=20)
+        txt_box = ctk.CTkTextbox(dialog, corner_radius=10, font=ctk.CTkFont(size=13))
+        txt_box.pack(pady=10, padx=20, fill="both", expand=True)
         txt_box.insert("end", self.t("update_notes"))
         txt_box.configure(state="disabled")
 
@@ -683,8 +755,8 @@ class BeytarchiverApp(TkinterDnD.Tk):
                 pass
             dialog.destroy()
 
-        btn_ok = ctk.CTkButton(dialog, text=self.t("btn_close_update"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=close_and_save)
-        btn_ok.pack(pady=12)
+        btn_ok = ctk.CTkButton(dialog, text=self.t("btn_close_update"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(size=14, weight="bold"), height=38, command=close_and_save)
+        btn_ok.pack(pady=(5, 20))
 
     def change_language(self, new_lang):
         self.current_lang = new_lang
