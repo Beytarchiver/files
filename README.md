@@ -43,25 +43,46 @@ Python veya ek bir kütüphane kurmanıza **gerek yoktur**.
 
 ---
 
-### 2️⃣ Android Telefona Kurulum ve Kablosuz Dosya Aktarımı *(Alpha)*
+### 2️⃣ Android Telefona Kurulum ve Test Rehberi *(Alpha — v4.0.1)*
+
+> 📄 **Detaylı Doküman:** [Android Kurulum ve Test Rehberi (`docs/android-install-and-test.md`)](docs/android-install-and-test.md)
 
 Bilgisayardan Android telefona (Android 8.0 / API 26 ve üzeri) bulut kullanmadan, doğrudan yerel ağ üzerinden dosya göndermek için:
 
-#### A) Android APK Kurulumu
-1. Depoda **[Actions → Android debug APK](https://github.com/beytu2855/files/actions)** sekmesini açın ve en son başarılı (yeşil) derlemeye tıklayın *(veya Releases sayfasına eklenen APK'yı indirin)*.
-2. **Artifacts** bölümünden `beytarchiver-android-4.0.1-...` ZIP paketini indirip açın.
-3. İçindeki `Beytarchiver-4.0.1-debug.apk` dosyasını telefonunuza aktarın ve açarak kurun (tarayıcı/dosya yöneticisi için *“Bilinmeyen kaynaklardan uygulama yükleme”* iznini onaylayın).
+#### A) Android APK Kurulumu ve SHA-256 Doğrulaması
+1. Depoda **[Actions → Android debug APK](https://github.com/beytu2855/files/actions)** sekmesini açın ve en son başarılı (yeşil) derlemeye tıklayın.
+2. **Artifacts** bölümünden `beytarchiver-android-4.0.1-<commit>` ZIP paketini indirip açın.
+3. ZIP içinde `Beytarchiver-4.0.1-debug.apk` ve `SHA256SUMS` dosyaları bulunur. İndirilen APK'nın SHA-256 bütünlüğünü doğrulamak için PowerShell'de:
+   ```powershell
+   Get-FileHash .\Beytarchiver-4.0.1-debug.apk -Algorithm SHA256
+   ```
+4. `Beytarchiver-4.0.1-debug.apk` dosyasını telefonunuza aktarın ve açarak kurun (tarayıcı/dosya yöneticisi için *“Bilinmeyen kaynaklardan uygulama yükleme”* iznini onaylayın).
+   - *Not:* Bu APK debug anahtarıyla imzalanır. *“Paket mevcut uygulamayla çakışıyor”* hatası alırsanız önceki alpha sürümünü kaldırıp yeniden kurun.
 
 #### B) Bilgisayardan Telefona İlk Aktarım Adımları
 1. **Aynı Ağ:** Bilgisayarınızın ve telefonunuzun aynı yerel ağda (aynı Wi-Fi veya aynı modeme bağlı Ethernet) olduğundan emin olun. *(Misafir Wi-Fi veya açık VPN bağlantıyı engelleyebilir.)*
 2. **Bağlantıyı Başlat:** Bilgisayarda Beytarchiver'ı açın → **📱 Telefonla Aktar** sekmesine geçin → ağ arabiriminizi seçip **Bağlantı Başlat** düğmesine tıklayın.
    - Windows Güvenlik Duvarı izin sorarsa yalnızca **Özel ağlar (Private networks)** kutucuğunu işaretleyip izin verin.
-3. **QR Kodu Okutun:** Telefonda Beytarchiver uygulamasını açın → **QR Kodunu Tara** düğmesine dokunun ve bilgisayar ekranındaki QR kodunu okutun.
+3. **QR Kodu Okutun:** Telefonda Beytarchiver uygulamasını açın → **QR Kodunu Tara** düğmesine dokunun ve bilgisayar ekranındaki QR kodunu okutun *(QR 120 saniyede bir yenilenir)*.
 4. **6 Haneli Kodu Onaylayın:** Hem bilgisayar hem telefon ekranında **6 haneli bir eşleştirme kodu** belirecektir. İki ekrandaki kod birebir aynıysa bilgisayardan **Kodlar Aynı — Onayla** düğmesine tıklayın.
 5. **Dosya Seçin ve Kaydedin:**
    - Bilgisayarda **Dosya Seç** düğmesiyle göndermek istediğiniz dosyayı (en fazla 1 GiB) seçin.
    - Telefonda **Al ve Kaydet** düğmesine dokunup dosyanın kaydedileceği klasörü seçin.
    - Aktarım boyunca telefon ekranını açık tutun. Dosya ulaştığında SHA-256 bütünlük doğrulaması otomatik yapılır ve bilgisayarda **Tamamlandı** bilgisi görünür.
+
+#### C) Gerçek Cihaz Test ve Kabul Tablosu
+
+| Kontrol | Sonuç |
+| --- | --- |
+| Telefon modeli, Android sürümü, Windows sürümü | Bekliyor |
+| APK kurulumu, kamera izni / izin reddi ve QR tarama | Bekliyor |
+| Kod karşılaştırması, Windows onayı / reddi | Bekliyor |
+| Sıfır bayt ve en az 10 MiB dosya aktarımı | Bekliyor |
+| Telefonda gösterilen SHA-256 ile `Get-FileHash` eşleşmesi | Bekliyor |
+| Wi-Fi kopması, iptal ve arka plana geçiş | Bekliyor |
+| Hedefte yetersiz alan ve kısmi dosya temizliği | Bekliyor |
+| QR / onay / oturum süresinin dolması | Bekliyor |
+| Sonraki alpha APK'yı kurma / imza farklılığı | Bekliyor |
 
 👉 Daha ayrıntılı teknik bilgi için: [Android Kurulum ve Test Rehberi](docs/android-install-and-test.md)
 
