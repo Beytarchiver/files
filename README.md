@@ -4,7 +4,7 @@
   <p><strong>Windows için Hepsi Bir Arada Arşivleme, Şifreli Kasa, Sistem Temizliği ve Telefona Dosya Aktarım Aracı</strong></p>
   <p>
     <a href="https://beytarchiver.github.io/">🌐 Resmi Web Sitesi</a> ·
-    <a href="https://github.com/Beytarchiver/files/releases/latest">⬇️ Windows İçin İndir (v4.0.1)</a> ·
+    <a href="https://github.com/Beytarchiver/files/releases/latest">⬇️ Windows İçin İndir (Son Yayımlanan Sürüm)</a> ·
     <a href="#-kurulum-rehberi">📖 Kurulum Rehberi</a> ·
     <a href="#-english-installation-guide">🇬🇧 English Guide</a>
   </p>
@@ -35,7 +35,8 @@
 Python veya ek bir kütüphane kurmanıza **gerek yoktur**.
 
 1. **[GitHub Releases](https://github.com/Beytarchiver/files/releases/latest)** sayfasına gidin.
-2. **Assets** altından **`Beytarchiver_v4.0.1_Setup.exe`** dosyasını indirin.
+2. **Assets** altından yayımlanan sürüme ait **`Beytarchiver_v<sürüm>_Setup.exe`** dosyasını indirin.
+   > v4.0.2 kaynak kodu hazırdır; Windows kurulum paketi ayrıca derlenip yayımlanmalıdır.
 3. İndirilen `.exe` dosyasına çift tıklayın.
    > 💡 **Windows SmartScreen Uyarısı Çıkarsa:** Uygulama yeni yayınlandığı için Windows Mavi Ekran uyarısı gösterebilir. Dosyayı resmi GitHub sayfasından indirdiyseniz **“Ek bilgi (More info)”** → **“Yine de çalıştır (Run anyway)”** düğmesine tıklayarak kuruluma devam edebilirsiniz.
 4. Kurulum sihirbazında (Inno Setup) dilerseniz **“Masaüstü simgesi oluştur”** kutucuğunu işaretleyin ve **İleri → Kur** adımlarını tamamlayın.
@@ -113,7 +114,7 @@ python -m venv .venv
 
 ### 4️⃣ Korumalı `.exe` ve Kurulum Paketi Derleme *(Nuitka + PyInstaller + Inno Setup)*
 
-Kaynak kodları C/makine koduna (`.pyd`) derleyip tek klasörlü `.exe` ve Inno Setup kurulum sihirbazı (`Beytarchiver_v4.0.1_Setup.exe`) üretmek için:
+Kaynak kodları C/makine koduna (`.pyd`) derleyip tek klasörlü `.exe` ve Inno Setup kurulum sihirbazı (`Beytarchiver_v4.0.2_Setup.exe`) üretmek için:
 
 ```powershell
 # 1. Nuitka + PyInstaller ile korumalı dist\Beytarchiver\Beytarchiver.exe üretir
@@ -173,7 +174,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
 ## 🇬🇧 English Installation Guide
 
 ### 1. Install via Windows Setup Wizard *(Recommended)*
-1. Go to **[GitHub Releases](https://github.com/Beytarchiver/files/releases/latest)** and download **`Beytarchiver_v4.0.1_Setup.exe`**.
+1. Go to **[GitHub Releases](https://github.com/Beytarchiver/files/releases/latest)** and download the published **`Beytarchiver_v<version>_Setup.exe`** installer. The v4.0.2 source is ready; its Windows installer must be built and published separately.
 2. Run the installer. If Windows SmartScreen appears, click **More info → Run anyway** (as long as you downloaded it from the official GitHub repository).
 3. Follow the setup wizard steps and launch **Beytarchiver Pro**. You can switch the interface language to **EN** anytime from the **⚙️ Settings** tab.
 

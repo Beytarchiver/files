@@ -29,7 +29,7 @@ ait önbelleği ve ayarları siler; kalıcı public imza sonraki yayın aşamas�
 
 ## Bilgisayar tarafını hazırlama
 
- Doğrudan Windows Kurulum Sihirbazı (`Beytarchiver_v4.0.2_Setup.exe`) ile kurabilir veya
+ Windows kurulum paketi yayımlandığında `Beytarchiver_v4.0.2_Setup.exe` ile kurabilir veya
 kaynak koddan çalıştırmak için Python bağımlılıklarını depo kökünden güncelleyebilirsiniz:
 
 ```powershell
