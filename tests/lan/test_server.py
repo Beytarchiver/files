@@ -85,6 +85,10 @@ def test_receipt_required_and_idempotent(server, tmp_path, payload):
     assert 'staged_path' not in offer
     endpoint = '/v1/files/' + offer['transfer_id']
     assert request(server, 'GET', endpoint, token=token) == (200, payload)
+    # The delivery thread flips the state after the client closes; poll instead of racing it.
+    deadline = time.monotonic() + 5
+    while server.state != 'awaiting_receipt' and time.monotonic() < deadline:
+        time.sleep(0.01)
     assert server.state == 'awaiting_receipt'
     receipt = {key: offer[key] for key in ('transfer_id', 'size', 'sha256')}
     assert request(server, 'POST', '/v1/receipt', receipt | {'sha256': 'bad'}, token)[0] == 400
