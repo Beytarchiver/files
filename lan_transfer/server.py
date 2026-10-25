@@ -162,6 +162,7 @@ class TransferServer:
         self._stop = threading.Event()
         self._cancel = threading.Event()
         self._lock = threading.RLock()
+        self._delivery_changed = threading.Condition(self._lock)
         self._prepare_lock = threading.Lock()
         self._offer = None
         self._state = 'idle'
@@ -286,32 +287,45 @@ class TransferServer:
                 handler.send_header('Cache-Control', 'no-store')
                 handler.send_header('Connection', 'close')
                 handler.end_headers()
+                with self._delivery_changed:
+                    if offer.size == 0 and self._offer is offer and not cancel.is_set():
+                        self._state = 'awaiting_receipt'
+                        self.emit('awaiting_receipt', bytes=0, total=0)
+                        self._delivery_changed.notify_all()
                 count, last_event = 0, 0
                 while True:
                     self.session.authorize(token)
                     if cancel.is_set() or self._stop.is_set(): raise OSError('cancelled')
                     chunk = stream.read(CHUNK_SIZE)
                     if not chunk: break
+                    # Never hold the state lock across potentially blocking I/O:
+                    # cancellation must remain able to close this connection.
                     handler.wfile.write(chunk)
                     count += len(chunk)
                     now = time.monotonic()
-                    if now - last_event >= .1:
-                        self.emit('progress', bytes=count, total=offer.size)
-                        last_event = now
-            with self._lock:
-                if self._offer is offer and not cancel.is_set():
-                    self._state = 'awaiting_receipt'
-                    self.emit('awaiting_receipt', bytes=offer.size, total=offer.size)
+                    with self._delivery_changed:
+                        if self._offer is offer and self._state == 'sending' and not cancel.is_set():
+                            if now - last_event >= .1:
+                                self.emit('progress', bytes=count, total=offer.size)
+                                last_event = now
+                            if count == offer.size:
+                                self._state = 'awaiting_receipt'
+                                self.emit('awaiting_receipt', bytes=offer.size, total=offer.size)
+                                self._delivery_changed.notify_all()
+                if count != offer.size:
+                    raise OSError('Snapshot size changed during transfer')
         except (OSError, ProtocolError):
-            with self._lock:
-                if self._offer is offer and self._state != 'cancelled':
+            with self._delivery_changed:
+                if self._offer is offer and self._state not in ('cancelled', 'completed'):
                     self._state = 'error'
                     self.emit('error', message='Aktarım kesildi; dosyayı yeniden gönderin.')
+                    self._delivery_changed.notify_all()
         finally:
             with self._lock:
                 if self._send_socket is handler.connection:
                     self._send_socket = None
-                if cancel.is_set() or (self._offer is offer and self._state in ('error', 'cancelled')):
+                if (self._offer is not offer or cancel.is_set()
+                        or self._state in ('error', 'cancelled', 'completed')):
                     self._cleanup_offer(offer)
 
     def receipt(self, body, token):
@@ -323,6 +337,16 @@ class TransferServer:
             if (type(body.get('size')) is not int or body['size'] != self._offer.size
                     or body.get('sha256') != self._offer.sha256):
                 raise ProtocolError(400, 'receipt_mismatch')
+            offer = self._offer
+            if self._state == 'sending':
+                # A receiver can read the final byte before the sender resumes
+                # after write(). Release the lock while waiting for that handoff.
+                self._delivery_changed.wait_for(
+                    lambda: self._state != 'sending' or self._offer is not offer
+                            or self._stop.is_set(), timeout=1.0)
+                self.session.authorize(token)
+                if self._offer is not offer:
+                    raise ProtocolError(409, 'receipt_not_expected')
             if self._state not in ('awaiting_receipt', 'completed'):
                 raise ProtocolError(409, 'receipt_not_expected')
             if self._state != 'completed':
@@ -343,6 +367,7 @@ class TransferServer:
                 try: self._send_socket.shutdown(socket.SHUT_RDWR)
                 except OSError: pass
             self._state = 'cancelled'
+            self._delivery_changed.notify_all()
             self._cleanup_offer()
             self.emit('cancelled')
 
@@ -351,6 +376,7 @@ class TransferServer:
             if self._stop.is_set(): return
             self._stop.set()
             self._cancel.set()
+            self._delivery_changed.notify_all()
         self.session.stop()
         if self._http:
             self._http.shutdown()

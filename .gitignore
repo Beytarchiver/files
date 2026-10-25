@@ -6,3 +6,7 @@ Output/
 InstallerOutput/
 .venv/
 *.spec
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/

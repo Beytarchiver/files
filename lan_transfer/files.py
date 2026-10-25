@@ -24,7 +24,11 @@ class PreparedOffer:
 
 
 def _stamp(info):
-    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+    # Windows stat/fstat can disagree on deprecated ctime. Birth time has the
+    # same meaning for both; identity, size and mtime still detect source changes.
+    timestamp = (getattr(info, 'st_birthtime_ns', info.st_ctime_ns)
+                 if os.name == 'nt' else info.st_ctime_ns)
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, timestamp)
 
 
 def prepare_offer(source, work_dir, cancel):

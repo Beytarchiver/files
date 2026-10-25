@@ -1,11 +1,28 @@
+param([switch]$Check)
+
 $ErrorActionPreference = 'Stop'
-$RepoRoot = Split-Path -Parent $RepoRoot; Set-Location $RepoRoot
+$RepoRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 
 if ($env:OS -ne 'Windows_NT') {
     throw 'Run this build on Windows.'
 }
 
 $Python = Join-Path $RepoRoot '.venv\Scripts\python.exe'
+foreach ($Required in @('beytarchiver.py', 'beyt_core.py', 'lan_transfer\__init__.py',
+                        'lan_transfer\panel.py', 'scripts\beytarchiver-requirements.txt',
+                        'logo.ico', 'logo.png')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot $Required) -PathType Leaf)) {
+        throw "Required project file missing: $Required"
+    }
+}
+if ($Check) {
+    Write-Host "Project paths OK: $RepoRoot"
+    Write-Host "Python present: $(Test-Path -LiteralPath $Python -PathType Leaf)"
+    return
+}
+
+Push-Location -LiteralPath $RepoRoot
+try {
 if (-not (Test-Path $Python)) {
     if (Get-Command py -ErrorAction SilentlyContinue) {
         & py -3 -m venv .venv
@@ -19,20 +36,28 @@ if (-not (Test-Path $Python)) {
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
 
 $NuitkaDir = Join-Path $RepoRoot 'build\nuitka_mod'
-if (Test-Path $NuitkaDir) { Remove-Item -Recurse -Force $NuitkaDir }
+$ResolvedNuitkaDir = [System.IO.Path]::GetFullPath($NuitkaDir)
+if (-not $ResolvedNuitkaDir.StartsWith($RepoRoot + [System.IO.Path]::DirectorySeparatorChar,
+                                     [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Build output must stay inside the repository.'
+}
+foreach ($BuildPath in @((Join-Path $RepoRoot 'build'), $ResolvedNuitkaDir)) {
+    if ((Test-Path -LiteralPath $BuildPath) -and
+        ((Get-Item -LiteralPath $BuildPath -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+        throw "Refusing to clean a linked build directory: $BuildPath"
+    }
+}
+if (Test-Path -LiteralPath $ResolvedNuitkaDir) {
+    Remove-Item -LiteralPath $ResolvedNuitkaDir -Recurse -Force
+}
 New-Item -ItemType Directory -Force -Path $NuitkaDir | Out-Null
 
-$AppDir = if (Test-Path (Join-Path $RepoRoot "beytarchiver.py")) { $RepoRoot } elseif (Test-Path (Join-Path $RepoRoot "app\beytarchiver.py")) { Join-Path $RepoRoot "app" } else { (Resolve-Path (Join-Path $RepoRoot "venv\Ak*")).Path }
-Push-Location $AppDir
-try {
     & $Python -m nuitka --mode=module beytarchiver.py `
         --include-package=lan_transfer `
+        --include-module=beyt_core `
         --output-dir="$NuitkaDir" `
         --remove-output --no-pyi-file --assume-yes-for-downloads
     if ($LASTEXITCODE -ne 0) { throw 'Nuitka native C compilation failed.' }
-} finally {
-    Pop-Location
-}
 
 $Launcher = Join-Path $NuitkaDir 'run_beytarchiver.py'
 @'
@@ -58,6 +83,7 @@ from PIL import Image
 from tkinterdnd2 import DND_FILES, TkinterDnD
 
 import beytarchiver
+import beyt_core
 
 if __name__ == "__main__":
     app = beytarchiver.BeytarchiverApp()
@@ -67,7 +93,8 @@ if __name__ == "__main__":
 & $Python -m PyInstaller --noconfirm --clean --onedir --windowed `
     --name Beytarchiver --icon logo.ico --add-data "logo.ico;." --add-data "logo.png;." `
     --distpath dist --workpath build `
-    --paths "$NuitkaDir" --hidden-import beytarchiver `
+    --paths "$NuitkaDir" --paths "$RepoRoot" --hidden-import beytarchiver `
+    --hidden-import beyt_core --collect-submodules lan_transfer `
     --collect-all customtkinter --collect-all tkinterdnd2 --collect-all qrcode `
     --exclude-module torch --exclude-module scipy --exclude-module sklearn `
     --exclude-module matplotlib --exclude-module pandas --exclude-module sympy `
@@ -76,4 +103,7 @@ if __name__ == "__main__":
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller build failed.' }
 
 Write-Host 'Native-protected EXE ready: dist\Beytarchiver\Beytarchiver.exe'
-Write-Host 'Test the EXE, then compile setup_scriss.iss with Inno Setup.'
+Write-Host 'Test the EXE, then compile scripts\setup_scriss.iss with Inno Setup.'
+} finally {
+    Pop-Location
+}

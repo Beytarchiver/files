@@ -32,10 +32,10 @@ def test_workspace_preserves_active_and_unknown_files_and_cleans_abandoned(tmp_p
     if os.name != 'nt': assert new.stat().st_mode & 0o777 == 0o700
 
 
-def test_workspace_never_follows_symlinks(tmp_path):
+def test_workspace_never_follows_symlinks(tmp_path, make_symlink):
     external=tmp_path/'outside'; external.mkdir(); (external/'keep').write_text('keep')
     root=tmp_path/'root'; root.mkdir()
-    (root/'session-link').symlink_to(external, target_is_directory=True)
+    make_symlink(root/'session-link', external, target_is_directory=True)
     implementation()(root)
     assert (external/'keep').read_text() == 'keep'
     alias=tmp_path/'alias'; alias.symlink_to(root,target_is_directory=True)

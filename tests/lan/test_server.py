@@ -83,12 +83,92 @@ def test_receipt_required_and_idempotent(server, tmp_path, payload):
     assert 'staged_path' not in offer
     endpoint = '/v1/files/' + offer['transfer_id']
     assert request(server, 'GET', endpoint, token=token) == (200, payload)
-    assert server.state == 'awaiting_receipt'
+    with server._delivery_changed:
+        assert server._delivery_changed.wait_for(lambda: server.state == 'awaiting_receipt', timeout=2)
     receipt = {key: offer[key] for key in ('transfer_id', 'size', 'sha256')}
     assert request(server, 'POST', '/v1/receipt', receipt | {'sha256': 'bad'}, token)[0] == 400
     for _ in range(2): assert request(server, 'POST', '/v1/receipt', receipt, token)[0] == 200
     assert server.state == 'completed'
     assert source.read_bytes() == payload
+
+
+@pytest.mark.parametrize('payload', [b'', b'hello' * 10000], ids=['empty', 'content'])
+def test_receipt_is_accepted_before_sender_closes_stream(server, tmp_path, monkeypatch, payload):
+    from contextlib import contextmanager
+    token = approve(server)
+    source = tmp_path / 'example'; source.write_bytes(payload)
+    server.offer(source)
+    offer = server.current_offer()
+    staged = server._offer.staged_path
+    waiting, release = threading.Event(), threading.Event()
+    original = Path.open
+    @contextmanager
+    def hold_open(path, *args, **kwargs):
+        with original(path, *args, **kwargs) as stream:
+            yield stream
+            if path == staged:
+                waiting.set()
+                assert release.wait(5)
+    monkeypatch.setattr(Path, 'open', hold_open)
+    try:
+        assert request(server, 'GET', '/v1/files/' + offer['transfer_id'], token=token) == (200, payload)
+        assert waiting.wait(2)
+        receipt = {key: offer[key] for key in ('transfer_id', 'size', 'sha256')}
+        assert request(server, 'POST', '/v1/receipt', receipt, token)[0] == 200
+        assert server.state == 'completed'
+        kinds = [event['kind'] for event in list(server.events.queue)]
+        assert 'progress' not in kinds[kinds.index('completed') + 1:]
+    finally:
+        release.set()
+
+
+def test_completed_sender_cleans_its_snapshot_after_offer_replaced(server, tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    token = approve(server)
+    source = tmp_path / 'source'; source.write_bytes(b'content')
+    server.offer(source)
+    first = server.current_offer()
+    old_path = server._offer.staged_path
+    in_use, waiting, release, cleaned = (threading.Event() for _ in range(4))
+    original_open, original_unlink = Path.open, Path.unlink
+    @contextmanager
+    def hold_open(path, *args, **kwargs):
+        if path != old_path:
+            with original_open(path, *args, **kwargs) as stream:
+                yield stream
+            return
+        in_use.set()
+        try:
+            with original_open(path, *args, **kwargs) as stream:
+                yield stream
+                waiting.set()
+                assert release.wait(5)
+        finally:
+            in_use.clear()
+    def windows_unlink(path, *args, **kwargs):
+        if path == old_path and in_use.is_set():
+            raise PermissionError('simulated Windows open-file deletion refusal')
+        result = original_unlink(path, *args, **kwargs)
+        if path == old_path:
+            cleaned.set()
+        return result
+    monkeypatch.setattr(Path, 'open', hold_open)
+    monkeypatch.setattr(Path, 'unlink', windows_unlink)
+    try:
+        assert request(server, 'GET', '/v1/files/' + first['transfer_id'], token=token)[0] == 200
+        assert waiting.wait(2)
+        receipt = {key: first[key] for key in ('transfer_id', 'size', 'sha256')}
+        assert request(server, 'POST', '/v1/receipt', receipt, token)[0] == 200
+        server.offer(source)
+        second = server.current_offer()
+        assert second['transfer_id'] != first['transfer_id']
+        release.set()
+        assert cleaned.wait(2)
+        assert not old_path.exists()
+        assert server.current_offer() == second
+        assert len(list(server.work_dir.glob('offer-*'))) == 1
+    finally:
+        release.set()
 
 
 def test_transfer_cannot_be_replaced_or_downloaded_twice(server, tmp_path):

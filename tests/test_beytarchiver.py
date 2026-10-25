@@ -189,9 +189,9 @@ def test_wrong_archive_password_leaves_no_output(tmp_path, kind):
     assert not list(tmp_path.glob('.beyt-extract-*'))
 
 
-def test_7z_rejects_symbolic_link(tmp_path):
+def test_7z_rejects_symbolic_link(tmp_path, make_symlink):
     original = tmp_path / 'original'; original.write_bytes(b'keep')
-    link = tmp_path / 'link'; link.symlink_to(original)
+    link = make_symlink(tmp_path / 'link', original)
     archive = tmp_path / 'link.7z'
     with app.py7zr.SevenZipFile(archive, 'w', dereference=False) as z:
         z.write(link, 'link')
@@ -261,11 +261,22 @@ def test_overwrite_deletes_only_regular_file(tmp_path):
     assert not path.exists()
 
 
-def test_overwrite_refuses_symlink_and_hardlink(tmp_path):
+def test_overwrite_refuses_symlink(tmp_path, make_symlink):
     path = tmp_path / 'keep'; path.write_bytes(b'original')
-    link = tmp_path / 'symbolic'; link.symlink_to(path)
+    link = make_symlink(tmp_path / 'symbolic', path)
     with pytest.raises(ValueError): api('overwrite_and_delete')(link)
-    link.unlink(); os.link(path, link)
+    assert path.read_bytes() == b'original'
+
+
+def test_overwrite_refuses_hardlink(tmp_path):
+    path = tmp_path / 'keep'; path.write_bytes(b'original')
+    link = tmp_path / 'hardlink'
+    try:
+        os.link(path, link)
+    except PermissionError as exc:
+        if os.name == 'nt' and getattr(exc, 'winerror', None) == 5:
+            pytest.skip('Windows sandbox/filesystem denies hard-link creation')
+        raise
     with pytest.raises(ValueError): api('overwrite_and_delete')(link)
     assert path.read_bytes() == b'original'
 

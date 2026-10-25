@@ -35,14 +35,32 @@ def test_over_limit_source_leaves_no_staging(tmp_path):
     assert not list(work.iterdir())
 
 
-def test_cancel_and_symlink_leave_no_staging(tmp_path):
+def test_cancel_leaves_no_staging(tmp_path):
     source = tmp_path / 'source'; source.write_bytes(b'keep')
     work = tmp_path / 'work'; work.mkdir()
     cancel = Event(); cancel.set()
     with pytest.raises(Exception): implementation()(source, work, cancel)
     assert not list(work.iterdir())
-    link = tmp_path / 'link'; link.symlink_to(source)
+
+
+def test_symlink_leaves_no_staging(tmp_path, make_symlink):
+    source = tmp_path / 'source'; source.write_bytes(b'keep')
+    work = tmp_path / 'work'; work.mkdir()
+    link = make_symlink(tmp_path / 'link', source)
     with pytest.raises(ValueError): implementation()(link, work, Event())
+    assert not list(work.iterdir())
+
+
+def test_windows_stamp_uses_birthtime_for_stat_fstat_consistency(monkeypatch):
+    from lan_transfer import files
+    from types import SimpleNamespace
+    monkeypatch.setattr(files, 'os', SimpleNamespace(name='nt'))
+    before = SimpleNamespace(st_dev=1, st_ino=2, st_size=10, st_mtime_ns=100,
+                             st_ctime_ns=99, st_birthtime_ns=50)
+    opened = SimpleNamespace(**(vars(before) | {'st_ctime_ns': 100}))
+    assert files._stamp(before) == files._stamp(opened)
+    changed = SimpleNamespace(**(vars(opened) | {'st_mtime_ns': 101}))
+    assert files._stamp(before) != files._stamp(changed)
 
 
 def test_changed_source_during_copy_is_rejected(tmp_path, monkeypatch):

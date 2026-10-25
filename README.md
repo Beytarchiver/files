@@ -12,6 +12,14 @@
 
 ---
 
+## Geliştirme ve klasör yapısı
+
+Kaynak koddan çalıştırma, Flet sürümü, testler ve derleme komutları için
+[geliştirme rehberine](docs/development.md) bakın. Masaüstü giriş noktası
+`beytarchiver.py`, Flet giriş noktası `mobile/main.py`, Kotlin Android projesi
+`android/` dizinidir. Ortak arşiv kodu `beyt_core.py`, LAN paketi `lan_transfer/`,
+testler `tests/`, korunan eski taslaklar `drafts/` altında bulunur.
+
 ## ✨ Öne Çıkan Özellikler
 
 | Modül | Açıklama |
