@@ -31,7 +31,7 @@ def test_network_list_contains_only_active_private_ipv4(monkeypatch):
     assert list(module.local_interfaces().values()) == ['192.168.1.2']
 
 
-@pytest.mark.skipif(not os.environ.get('DISPLAY'), reason='Requires a graphical display')
+@pytest.mark.skipif(os.name != 'nt' and not os.environ.get('DISPLAY'), reason='Requires a graphical display')
 @pytest.mark.parametrize('mode', ['dark', 'light'])
 def test_transfer_instructions_remain_readable_on_plain_tk_root(mode):
     module = panel_module()
@@ -62,7 +62,7 @@ def test_transfer_instructions_remain_readable_on_plain_tk_root(mode):
         module.ctk.set_appearance_mode(previous)
 
 
-@pytest.mark.skipif(not os.environ.get('DISPLAY'), reason='Requires a graphical display')
+@pytest.mark.skipif(os.name != 'nt' and not os.environ.get('DISPLAY'), reason='Requires a graphical display')
 def test_panel_worker_dispatch_and_duplicate_start(monkeypatch):
     module = panel_module()
     import tkinter as tk
@@ -103,7 +103,7 @@ def test_panel_worker_dispatch_and_duplicate_start(monkeypatch):
         panel.shutdown(); root.destroy()
 
 
-@pytest.mark.skipif(not os.environ.get('DISPLAY'), reason='Requires a graphical display')
+@pytest.mark.skipif(os.name != 'nt' and not os.environ.get('DISPLAY'), reason='Requires a graphical display')
 def test_main_window_contains_transfer_panel_and_shuts_it_down(tmp_path, monkeypatch):
     panel_module()
     source=Path(__file__).parents[2]/'beytarchiver.py'
