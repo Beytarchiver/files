@@ -63,3 +63,16 @@ def test_failed_archive_leaves_no_output(tmp_path, method, args):
         lbl_status=Mock(),lbl_vault_status=Mock(),finish_compression=lambda:None)
     getattr(app.BeytarchiverApp,method)(obj,[str(missing)],*args)
     assert not list(tmp_path.glob('secure_vault*'))
+
+
+@pytest.mark.skipif(__import__('sys').platform != 'win32', reason='Requires real Windows APIs')
+def test_real_windows_memory_trim():
+    import ctypes
+    assert ctypes.sizeof(ctypes.c_void_p) == 8, 'Run this regression on 64-bit Windows'
+    updates = []
+    label = SimpleNamespace(configure=lambda **kwargs: updates.append(kwargs))
+    obj = SimpleNamespace(lbl_ram_status=label, t=lambda key: key,
+                          safe_ui_update=lambda f, *args, **kwargs: f(*args, **kwargs))
+    # Calls real GetCurrentProcess / EmptyWorkingSet, without mocking ctypes.
+    app.BeytarchiverApp.clean_ram(obj)
+    assert updates and updates[-1]['text'] == 'ram_done', updates

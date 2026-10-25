@@ -385,7 +385,7 @@ def test_compression_worker_round_trip(tmp_path, monkeypatch, kind):
     target.finish_compression.assert_called_once()
 
 
-@pytest.mark.skipif(not os.environ.get('DISPLAY'), reason='Requires a graphical display')
+@pytest.mark.skipif(os.name != 'nt' and not os.environ.get('DISPLAY'), reason='Requires a graphical display')
 def test_real_gui_navigation_vault_and_queue(tmp_path, monkeypatch):
     monkeypatch.setattr(app.Path, 'home', lambda: tmp_path)
     version = tmp_path / 'version'; version.write_text(app.CURRENT_VERSION)

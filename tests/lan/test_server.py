@@ -1,4 +1,5 @@
 import hashlib
+import os
 import faulthandler
 import http.client
 import json
@@ -130,7 +131,8 @@ def test_request_limits(server):
     assert request(server, 'GET', '/not-real')[0] == 404
 
 
-def test_half_open_tls_handshake_does_not_block_other_clients(server, monkeypatch):
+@pytest.mark.parametrize('iteration', range(int(os.environ.get('BEYT_TLS_REPETITIONS', '1'))))
+def test_half_open_tls_handshake_does_not_block_other_clients(server, monkeypatch, iteration):
     first_handshake = threading.Event()
     original_handshake = ssl.SSLSocket.do_handshake
 
