@@ -1,4 +1,4 @@
-# Beytarchiver Android v4.0.1 — Kurulum ve Test Rehberi
+# Beytarchiver Android v4.0.2 — Kurulum ve Test Rehberi
 
 Bu test sürümü aynı yerel ağda Windows Beytarchiver'dan Android telefona tek dosya
 alma içindir. Android Studio kurulması gerekmez. Android 8.0 (API 26) veya üzeri
@@ -9,13 +9,13 @@ hedeflenir; her Android sürümü / telefon modelinde denenmiş olduğu iddia ed
 1. Depoda **Actions → Android debug APK** akışını açın. İlgili commit / dal için
    başarılı (yeşil) çalıştırmayı seçin. Push akışı derlemeyi otomatik başlatır;
    workflow varsayılan dalda bulunduğunda **Run workflow** ile de başlatılabilir.
-2. **Artifacts** bölümünden `beytarchiver-android-4.0.1-<commit>` arşivini
+2. **Artifacts** bölümünden `beytarchiver-android-4.0.2-<commit>` arşivini
    indirin. GitHub oturumu gerekebilir; artifact 14 gün tutulur.
-3. ZIP'i açın. `Beytarchiver-4.0.1-debug.apk` ve `SHA256SUMS` bulunur.
+3. ZIP'i açın. `Beytarchiver-4.0.2-debug.apk` ve `SHA256SUMS` bulunur.
    İndirilen APK'nın SHA-256 değerini kontrol etmek için Windows PowerShell'de:
 
    ```powershell
-   Get-FileHash .\Beytarchiver-4.0.1-debug.apk -Algorithm SHA256
+   Get-FileHash .\Beytarchiver-4.0.2-debug.apk -Algorithm SHA256
    ```
 
 4. APK'yı telefona aktarın. Android'in ilgili dosya yöneticisi veya tarayıcı için
@@ -29,7 +29,7 @@ ait önbelleği ve ayarları siler; kalıcı public imza sonraki yayın aşamas�
 
 ## Bilgisayar tarafını hazırlama
 
- Doğrudan Windows Kurulum Sihirbazı (`Beytarchiver_v4.0.1_Setup.exe`) ile kurabilir veya
+ Doğrudan Windows Kurulum Sihirbazı (`Beytarchiver_v4.0.2_Setup.exe`) ile kurabilir veya
 kaynak koddan çalıştırmak için Python bağımlılıklarını depo kökünden güncelleyebilirsiniz:
 
 ```powershell

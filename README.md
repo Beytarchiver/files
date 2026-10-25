@@ -1,10 +1,10 @@
 <div align="center">
   <img src="logo.png" alt="Beytarchiver Logo" width="110" height="110">
-  <h1>Beytarchiver v4.0.1</h1>
+  <h1>Beytarchiver v4.0.2</h1>
   <p><strong>Windows için Hepsi Bir Arada Arşivleme, Şifreli Kasa, Sistem Temizliği ve Telefona Dosya Aktarım Aracı</strong></p>
   <p>
     <a href="https://beytarchiver.github.io/">🌐 Resmi Web Sitesi</a> ·
-    <a href="https://github.com/beytu2855/files/releases/latest">⬇️ Windows İçin İndir (v4.0.1)</a> ·
+    <a href="https://github.com/Beytarchiver/files/releases/latest">⬇️ Windows İçin İndir (v4.0.1)</a> ·
     <a href="#-kurulum-rehberi">📖 Kurulum Rehberi</a> ·
     <a href="#-english-installation-guide">🇬🇧 English Guide</a>
   </p>
@@ -34,7 +34,7 @@
 
 Python veya ek bir kütüphane kurmanıza **gerek yoktur**.
 
-1. **[GitHub Releases](https://github.com/beytu2855/files/releases/latest)** sayfasına gidin.
+1. **[GitHub Releases](https://github.com/Beytarchiver/files/releases/latest)** sayfasına gidin.
 2. **Assets** altından **`Beytarchiver_v4.0.1_Setup.exe`** dosyasını indirin.
 3. İndirilen `.exe` dosyasına çift tıklayın.
    > 💡 **Windows SmartScreen Uyarısı Çıkarsa:** Uygulama yeni yayınlandığı için Windows Mavi Ekran uyarısı gösterebilir. Dosyayı resmi GitHub sayfasından indirdiyseniz **“Ek bilgi (More info)”** → **“Yine de çalıştır (Run anyway)”** düğmesine tıklayarak kuruluma devam edebilirsiniz.
@@ -43,20 +43,20 @@ Python veya ek bir kütüphane kurmanıza **gerek yoktur**.
 
 ---
 
-### 2️⃣ Android Telefona Kurulum ve Test Rehberi *(Alpha — v4.0.1)*
+### 2️⃣ Android Telefona Kurulum ve Test Rehberi *(Alpha — v4.0.2)*
 
 > 📄 **Detaylı Doküman:** [Android Kurulum ve Test Rehberi (`docs/android-install-and-test.md`)](docs/android-install-and-test.md)
 
 Bilgisayardan Android telefona (Android 8.0 / API 26 ve üzeri) bulut kullanmadan, doğrudan yerel ağ üzerinden dosya göndermek için:
 
 #### A) Android APK Kurulumu ve SHA-256 Doğrulaması
-1. Depoda **[Actions → Android debug APK](https://github.com/beytu2855/files/actions)** sekmesini açın ve en son başarılı (yeşil) derlemeye tıklayın.
-2. **Artifacts** bölümünden `beytarchiver-android-4.0.1-<commit>` ZIP paketini indirip açın.
-3. ZIP içinde `Beytarchiver-4.0.1-debug.apk` ve `SHA256SUMS` dosyaları bulunur. İndirilen APK'nın SHA-256 bütünlüğünü doğrulamak için PowerShell'de:
+1. Depoda **[Actions → Android debug APK](https://github.com/Beytarchiver/files/actions)** sekmesini açın ve en son başarılı (yeşil) derlemeye tıklayın.
+2. **Artifacts** bölümünden `beytarchiver-android-4.0.2-<commit>` ZIP paketini indirip açın.
+3. ZIP içinde `Beytarchiver-4.0.2-debug.apk` ve `SHA256SUMS` dosyaları bulunur. İndirilen APK'nın SHA-256 bütünlüğünü doğrulamak için PowerShell'de:
    ```powershell
-   Get-FileHash .\Beytarchiver-4.0.1-debug.apk -Algorithm SHA256
+   Get-FileHash .\Beytarchiver-4.0.2-debug.apk -Algorithm SHA256
    ```
-4. `Beytarchiver-4.0.1-debug.apk` dosyasını telefonunuza aktarın ve açarak kurun (tarayıcı/dosya yöneticisi için *“Bilinmeyen kaynaklardan uygulama yükleme”* iznini onaylayın).
+4. `Beytarchiver-4.0.2-debug.apk` dosyasını telefonunuza aktarın ve açarak kurun (tarayıcı/dosya yöneticisi için *“Bilinmeyen kaynaklardan uygulama yükleme”* iznini onaylayın).
    - *Not:* Bu APK debug anahtarıyla imzalanır. *“Paket mevcut uygulamayla çakışıyor”* hatası alırsanız önceki alpha sürümünü kaldırıp yeniden kurun.
 
 #### B) Bilgisayardan Telefona İlk Aktarım Adımları
@@ -119,7 +119,7 @@ Kaynak kodları C/makine koduna (`.pyd`) derleyip tek klasörlü `.exe` ve Inno 
 # 1. Nuitka + PyInstaller ile korumalı dist\Beytarchiver\Beytarchiver.exe üretir
 powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
 
-# 2. Inno Setup ile Output\Beytarchiver_v4.0.1_Setup.exe kurulum dosyasını derler
+# 2. Inno Setup ile Output\Beytarchiver_v4.0.2_Setup.exe kurulum dosyasını derler
 & "C:\Program Files\Inno Setup 7\ISCC.exe" .\scripts\setup_scriss.iss
 ```
 
@@ -127,7 +127,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
 
 ## 📜 Sürüm Geçmişi (Changelog)
 
-### ✨ v4.0.1 *(Güncel Sürüm — 18 Ekim 2026)*
+### ✨ v4.0.2 *(Kaynak kodu sürümü)*
+- Boş dosyalar kopya taramasından çıkarılır; toplu silmede her grupta diskte en az bir dosya korunur.
+- Düzenleyicinin geri alma kaydı oturum boyunca tutulur; dosya taşımayan işlem bu kaydı silmez.
+- Arşiv/kasa çıktıları geçici dosyada hazırlanır; hatalı çıktılar temizlenir ve mevcut dosyaların üzerine yazılmaz.
+- Aynı arşivi yeniden açmak için yeni bir hedef klasör seçilir.
+- Güncelleme indirmesi yalnızca resmi depo URL'si ve release varlığının SHA-256 özetiyle kabul edilir; özet yoksa indirme reddedilir.
+- Açılışta güncelleme kontrolü varsayılan olarak kapalıdır ve ayarlardan açılabilir.
+- System görünüm seçimi korunur; izleyici yeniden başlatıldığında eski iş parçacığı sonlanır.
+- Windows bellek azaltma çağrısının tutamak türü ve hata sonucu kontrol edilir.
+- Bu başlık kaynak kodunu tanımlar; Windows kurulum dosyası ayrıca Windows üzerinde derlenip doğrulanmalıdır.
+
+### ✨ v4.0.1 *(18 Ekim 2026)*
 - 🧹 **Sistem Temizleyici:** Windows Temp ve AppData Temp klasörlerinin aynı dizini işaret ettiği durumlarda oluşan çift sayım hatası giderildi.
 - 📁 **Akıllı Düzenleyici & Arşivleme:** Masaüstü/İndirilenler düzenleyicisine işlem öncesi onay penceresi eklendi, arka plan iş parçacığına (thread) taşındı ve aynı isimli dosyaların üzerine yazması (` (1)`, ` (2)` adlandırmasıyla) engellendi; arşivler artık kaynak dosyanın bulunduğu klasöre kaydediliyor.
 - ⚡ **Performans İyileştirmeleri:** Çift Dosya Bulucu önce dosya boyutuna göre ön-gruplama yaparak yalnızca aynı boyuttaki adayların SHA-256 özetini hesaplıyor; Canlı Kaynak İzleyici sekmeden çıkıldığında otomatik duraklatılıyor.
@@ -147,7 +158,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
 
 ### ✨ v3.5 *(Logo & Visual Upgrade)*
 - 🖼️ **Logo ve İkon Entegrasyonu:** Uygulama içi üst araç çubuğu logosu ve Windows pencere/görev çubuğu ikonu (`logo.ico` / `logo.png`) eklendi.
-- 🎨 **11 Renk Paleti & Görünüm Modu:** *Catppuccin, Emerald, Cyberpunk, Nordic, Dracula, Sunset* dahil 11 özel renk teması ve Koyu/Açık/Sistem görünüm modu senkronizasyonu.
+- 🎨 **11 Renk Paleti & Görünüm Modu:** *Catppuccin, Emerald, Cyberpunk, Nordic, Sunset* dahil 11 özel renk teması ve Koyu/Açık/Sistem görünüm modu senkronizasyonu.
 - 🔐 **Gizli Kasa (`.beyt`):** AES-256 şifreli özel `.beyt` kasa oluşturma ve çıkartma desteği.
 - ⚡ **Bellek Azaltıcı & Yazılım Güncelleyici:** Çalışma kümesi (`EmptyWorkingSet`) bellek azaltıcı ve `winget` tabanlı eski yazılım tarayıcısı.
 

@@ -7,6 +7,7 @@ on:
       - 'android/**'
       - 'tests/**'
       - 'beytarchiver.py'
+      - 'beyt_core.py'
       - 'lan_transfer/**'
       - 'scripts/beytarchiver-requirements.txt'
       - '.github/workflows/android-debug.yml'
@@ -15,6 +16,7 @@ on:
       - 'android/**'
       - 'tests/**'
       - 'beytarchiver.py'
+      - 'beyt_core.py'
       - 'lan_transfer/**'
       - 'scripts/beytarchiver-requirements.txt'
       - '.github/workflows/android-debug.yml'
@@ -70,10 +72,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/Beytarchiver-4.0.1-debug.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/Beytarchiver-4.0.2-debug.apk
           cd artifacts
-          sha256sum Beytarchiver-4.0.1-debug.apk > SHA256SUMS
-          echo "ARTIFACT_NAME=beytarchiver-android-4.0.1-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
+          sha256sum Beytarchiver-4.0.2-debug.apk > SHA256SUMS
+          echo "ARTIFACT_NAME=beytarchiver-android-4.0.2-${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
       - name: Upload test APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

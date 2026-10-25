@@ -11,8 +11,8 @@ android {
         applicationId = "com.beytarchiver.mobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "4.0.1"
+        versionCode = 3
+        versionName = "4.0.2"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

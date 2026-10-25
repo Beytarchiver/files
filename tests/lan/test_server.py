@@ -1,4 +1,5 @@
 import hashlib
+import faulthandler
 import http.client
 import json
 from pathlib import Path
@@ -129,11 +130,30 @@ def test_request_limits(server):
     assert request(server, 'GET', '/not-real')[0] == 404
 
 
-def test_half_open_tls_handshake_does_not_block_other_clients(server):
+def test_half_open_tls_handshake_does_not_block_other_clients(server, monkeypatch):
+    first_handshake = threading.Event()
+    original_handshake = ssl.SSLSocket.do_handshake
+
+    def observe_handshake(sock, *args, **kwargs):
+        if sock.server_side:
+            first_handshake.set()
+        return original_handshake(sock, *args, **kwargs)
+
+    monkeypatch.setattr(ssl.SSLSocket, 'do_handshake', observe_handshake)
     raw = socket.create_connection(('127.0.0.1', server.port), timeout=2)
     try:
-        assert request(server, 'GET', '/v1/offer')[0] == 401
-    finally: raw.close()
+        # Exercise an actual pending server handshake, not merely a connection
+        # queued in the OS backlog before its worker has started.
+        assert first_handshake.wait(3), 'Server did not start the first TLS handshake'
+        try:
+            assert request(server, 'GET', '/v1/offer')[0] == 401
+        except TimeoutError:
+            # Preserve the failure and show whether accept, registry locking or
+            # TLS is blocking on the runner. No socket contents or tokens.
+            faulthandler.dump_traceback(all_threads=True)
+            raise
+    finally:
+        raw.close()
 
 
 def test_connection_limit_and_stop_closes_pending_handshakes(server):

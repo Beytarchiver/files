@@ -1,6 +1,5 @@
 import ctypes
 import base64
-import gzip
 import hashlib
 import ntpath
 import os
@@ -11,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.request
 import psutil
 import json
 import tarfile
@@ -27,6 +27,7 @@ import pyzipper
 from tkinter import filedialog, ttk, messagebox, simpledialog
 from tkinterdnd2 import DND_FILES, TkinterDnD
 from lan_transfer.panel import TransferPanel
+from beyt_core import format_size, safe_extract_archive, unique_arcname
 
 # --- Windows Özel Kütüphaneler ---
 try:
@@ -49,13 +50,76 @@ except ImportError:
     HAS_PLYER = False
 
 # --- Sabitler ve Versiyon ---
-CURRENT_VERSION = "4.0.1"
+CURRENT_VERSION = "4.0.2"
 VERSION_FILE = os.path.expanduser("~/.beytarchiver_version")
+CONFIG_DIR = Path.home() / ".beytarchiver"
+CONFIG_FILE = CONFIG_DIR / "config.json"
+# GitHub depo kimliği: sürümler bu depodaki Releases bölümünden yayınlanır.
+GITHUB_REPO = "Beytarchiver/files"
 SHERB_NOCONFIRMATION = 0x00000001
 SHERB_NOPROGRESSUI = 0x00000002
 SHERB_NOSOUND = 0x00000004
 
 # --- Yardımcı Fonksiyonlar ---
+def download_verified(url, destination, digest):
+    prefix = f"https://github.com/{GITHUB_REPO}/releases/download/"
+    if not url.startswith(prefix):
+        raise ValueError("Untrusted release URL")
+    if not isinstance(digest, str) or not digest.startswith("sha256:"):
+        raise ValueError("Release SHA-256 digest is missing")
+    expected = digest[7:].lower()
+    if len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected):
+        raise ValueError("Invalid SHA-256 digest")
+    destination = Path(destination)
+    if os.path.lexists(destination):
+        raise FileExistsError(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix=destination.name + ".", suffix=".part", dir=destination.parent)
+    try:
+        with os.fdopen(fd, "wb") as out:
+            request = urllib.request.Request(url, headers={"User-Agent": f"Beytarchiver/{CURRENT_VERSION}"})
+            with urllib.request.urlopen(request, timeout=60) as response:
+                hasher = hashlib.sha256()
+                count = 0
+                for chunk in iter(lambda: response.read(1024 * 1024), b""):
+                    out.write(chunk)
+                    hasher.update(chunk)
+                    count += len(chunk)
+                length = response.headers.get("Content-Length")
+                if length is not None and count != int(length):
+                    raise ValueError("Incomplete download")
+                if hasher.hexdigest() != expected:
+                    raise ValueError("SHA-256 mismatch")
+            out.flush()
+            os.fsync(out.fileno())
+        # Atomic publication without overwriting an existing destination.
+        os.link(name, destination)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def unused_path(path):
+    path = Path(path)
+    candidate = path
+    n = 1
+    while os.path.lexists(candidate):
+        candidate = path.with_name(f"{path.stem} ({n}){path.suffix}")
+        n += 1
+    return candidate
+
+
+def duplicates_have_survivors(groups, selected):
+    selected = {os.path.normcase(os.path.abspath(p)) for p in selected}
+    for _, _, paths in groups:
+        normalized = {os.path.normcase(os.path.abspath(p)) for p in paths}
+        if normalized & selected and not any(
+            p not in selected and os.path.isfile(p) and not os.path.islink(p)
+            for p in normalized
+        ):
+            return False
+    return True
+
+
 def resource_path(relative_path):
     for base in (
         Path(getattr(sys, "_MEIPASS", "")),
@@ -99,12 +163,6 @@ def get_path_size(path):
                 pass
     return total_size
 
-def format_size(bytes_val):
-    if not bytes_val: return "0 B"
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if bytes_val < 1024: return f"{bytes_val:.2f} {unit}"
-        bytes_val /= 1024
-    return f"{bytes_val:.2f} PB"
 
 def open_in_explorer(path):
     if not os.path.exists(path): return
@@ -113,14 +171,78 @@ def open_in_explorer(path):
     elif sys.platform == "darwin": subprocess.Popen(["open", path])
     else: subprocess.Popen(["xdg-open", path])
 
-def unique_arcname(arc, used):
-    base, ext = os.path.splitext(arc)
-    cand, n = arc, 1
-    while cand in used:
-        cand = f"{base} ({n}){ext}"
-        n += 1
-    used.add(cand)
-    return cand
+
+def load_config():
+    try:
+        data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_config(data):
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        fd, name = tempfile.mkstemp(prefix=".beyt-config-", dir=CONFIG_DIR)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(data, stream, ensure_ascii=False, indent=2)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(name, CONFIG_FILE)
+        finally:
+            if os.path.exists(name):
+                os.unlink(name)
+    except Exception:
+        pass
+
+
+def parse_version(text):
+    parts = []
+    for token in str(text).split(".")[:4]:
+        digits = ""
+        for ch in token:
+            if ch.isdigit():
+                digits += ch
+            elif digits:
+                break
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def send_to_recycle_bin(paths):
+    """Windows: dosyaları Geri Dönüşüm Kutusu'na taşır (FOF_ALLOWUNDO)."""
+    if sys.platform != "win32":
+        raise OSError("Geri Dönüşüm Kutusu yalnızca Windows'ta desteklenir.")
+    existing = [os.path.abspath(p) for p in paths if os.path.exists(p)]
+    if not existing:
+        return 0
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        _fields_ = [
+            ("hwnd", ctypes.c_void_p),
+            ("wFunc", ctypes.c_uint),
+            ("pFrom", ctypes.c_wchar_p),
+            ("pTo", ctypes.c_wchar_p),
+            ("fFlags", ctypes.c_ushort),
+            ("fAnyOperationsAborted", ctypes.c_int),
+            ("hNameMappings", ctypes.c_void_p),
+            ("lpszProgressTitle", ctypes.c_wchar_p),
+        ]
+
+    FO_DELETE = 0x0003
+    FOF_SILENT = 0x0004
+    FOF_NOCONFIRMATION = 0x0010
+    FOF_ALLOWUNDO = 0x0040
+
+    operation = SHFILEOPSTRUCTW()
+    operation.wFunc = FO_DELETE
+    operation.pFrom = "\0".join(existing) + "\0\0"
+    operation.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT
+    result = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(operation))
+    if result or operation.fAnyOperationsAborted:
+        raise OSError(f"Geri Dönüşüm Kutusu işlemi başarısız (kod {result}).")
+    return len(existing)
 
 
 class PasswordVault:
@@ -209,121 +331,6 @@ class PasswordVault:
         self.data = dict(data)
 
 
-def safe_extract_archive(archive_path, output_dir, password='', *,
-                         max_total_size=2 * 1024**3, max_files=10000):
-    """Extract only regular files/directories into a new destination, or leave none."""
-    archive_path, output_dir = Path(archive_path), Path(output_dir)
-    if os.path.lexists(output_dir):
-        raise FileExistsError('Hedef zaten var; farklı veya boşta bir hedef seçin.')
-    if max_total_size < 0 or max_files < 1:
-        raise ValueError('Geçersiz çıkartma sınırları.')
-    reserved = {'CON', 'PRN', 'AUX', 'NUL', 'CONIN$', 'CONOUT$'}
-    reserved.update(f'{prefix}{i}' for prefix in ('COM', 'LPT') for i in range(1, 10))
-    seen, count, declared, actual = {}, 0, 0, 0
-
-    with tempfile.TemporaryDirectory(prefix='.beyt-extract-', dir=output_dir.parent) as temp:
-        stage = Path(temp) / 'content'
-        stage.mkdir()
-
-        def target(name, size, is_dir):
-            nonlocal count, declared
-            count += 1
-            declared += size
-            if count > max_files or size < 0 or declared > max_total_size:
-                raise ValueError('Arşiv dosya sayısı veya açılmış boyut sınırını aşıyor.')
-            normalized = name.replace('\\', '/')
-            parts = normalized.split('/')
-            if (not normalized or normalized.startswith('/') or ntpath.splitdrive(name)[0]
-                    or '..' in parts or any(ord(c) < 32 for c in name)):
-                raise ValueError(f'Güvensiz arşiv yolu: {name!r}')
-            parts = [part for part in parts if part not in ('', '.')]
-            for part in parts:
-                if (part.endswith((' ', '.')) or any(c in part for c in ':<>"|?*')
-                        or part.split('.')[0].upper() in reserved):
-                    raise ValueError(f'Güvensiz dosya adı: {name!r}')
-            if not parts:
-                if is_dir:
-                    return stage
-                raise ValueError('Boş dosya adı.')
-            key = '/'.join(parts).casefold()
-            if key in seen:
-                raise ValueError(f'Çakışan arşiv yolu: {name!r}')
-            for i in range(1, len(parts)):
-                if seen.get('/'.join(parts[:i]).casefold()) is False:
-                    raise ValueError('Dosya ve klasör yolları çakışıyor.')
-            if not is_dir and any(k.startswith(key + '/') for k in seen):
-                raise ValueError('Dosya ve klasör yolları çakışıyor.')
-            seen[key] = is_dir
-            return stage.joinpath(*parts)
-
-        def copy_stream(source, destination):
-            nonlocal actual
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            with destination.open('xb') as sink:
-                while True:
-                    chunk = source.read(min(1024 * 1024, max_total_size - actual + 1))
-                    if not chunk:
-                        break
-                    actual += len(chunk)
-                    if actual > max_total_size:
-                        raise ValueError('Açılmış veri boyut sınırını aşıyor.')
-                    sink.write(chunk)
-
-        ext = archive_path.suffix.lower()
-        if ext in ('.zip', '.beyt'):
-            with pyzipper.AESZipFile(archive_path, 'r') as archive:
-                if password:
-                    archive.setpassword(password.encode('utf-8'))
-                entries = []
-                for info in archive.infolist():
-                    kind = stat.S_IFMT(info.external_attr >> 16)
-                    if kind not in (0, stat.S_IFREG, stat.S_IFDIR):
-                        raise ValueError('Arşivde bağlantı veya özel dosya var.')
-                    entries.append((info, target(info.filename, info.file_size, info.is_dir())))
-                for info, dest in entries:
-                    if info.is_dir():
-                        dest.mkdir(parents=True, exist_ok=True)
-                    else:
-                        with archive.open(info) as source:
-                            copy_stream(source, dest)
-        elif ext == '.7z':
-            # py7zr >= 1.1.4 enforces the size limit during decompression too.
-            with py7zr.SevenZipFile(archive_path, 'r', password=password or None,
-                                   max_extract_size=max_total_size) as archive:
-                for info in archive.list():
-                    if info.is_symlink or not (info.is_file or info.is_directory):
-                        raise ValueError('Arşivde bağlantı veya özel dosya var.')
-                    target(info.filename, info.uncompressed, info.is_directory)
-                archive.extractall(path=stage)
-        elif ext in ('.tar', '.gz', '.tgz'):
-            # A .gz file can hold a tar archive or a single compressed stream.
-            try:
-                archive = tarfile.open(archive_path, 'r:*')
-            except tarfile.ReadError:
-                if ext != '.gz':
-                    raise
-                dest = target(archive_path.stem, 0, False)
-                with gzip.open(archive_path, 'rb') as source:
-                    copy_stream(source, dest)
-            else:
-                with archive:
-                    entries = []
-                    for info in archive:
-                        if not (info.isfile() or info.isdir()):
-                            raise ValueError('Arşivde bağlantı veya özel dosya var.')
-                        entries.append((info, target(info.name, info.size, info.isdir())))
-                    for info, dest in entries:
-                        if info.isdir():
-                            dest.mkdir(parents=True, exist_ok=True)
-                        else:
-                            with archive.extractfile(info) as source:
-                                copy_stream(source, dest)
-        else:
-            raise ValueError('Desteklenmeyen arşiv biçimi.')
-        if os.path.lexists(output_dir):
-            raise FileExistsError('Hedef işlem sırasında oluşturuldu; üzerine yazılmadı.')
-        stage.rename(output_dir)
-    return output_dir
 
 
 def overwrite_and_delete(path):
@@ -428,23 +435,57 @@ LANGUAGES = {
         "updater_btn": "🔍 Eski Sürüm Yazılımları Tara (winget)",
         "analyzer_btn": "📁 Taranacak Klasörü/Sürücüyü Seç",
         "dup_btn": "🔍 Klasör Seç ve Çift Dosyaları Tara",
+        "dup_select_copies": "🎯 Kopyaları Seç (Orijinal Korunur)",
+        "dup_recycle": "🗑️ Geri Dönüşüme Gönder",
+        "dup_perm": "🔥 Kalıcı Sil",
+        "dup_delete_title": "Çift Dosya Silme Onayı",
+        "dup_confirm_recycle": "Seçili {count} kopya dosya Geri Dönüşüm Kutusu'na gönderilecek. Devam edilsin mi?",
+        "dup_confirm_perm": "Seçili {count} kopya dosya KALICI OLARAK silinecek (geri alınamaz). Devam edilsin mi?",
+        "dup_no_selection": "Önce silinecek kopya dosyaları seçin (veya 'Kopyaları Seç' düğmesini kullanın).",
+        "dup_deleted": "✅ {count} dosya silindi.",
+        "dup_delete_fail": "⚠️ {count} dosya silinemedi.",
+        "dup_summary": "Tarama Bitti: {groups} grup, {copies} silinebilir kopya bulundu!",
+        "dup_selected": "🎯 {count} kopya seçildi (orijinaller korunuyor).",
+        "dup_original_tag": "  ⭐ (orijinal)",
         "shred_title": "🔥 Dosyanın Üzerine Yaz ve Sil",
         "shred_btn": "🔥 Kalıcı Olarak İmha Edilecek Dosyayı Seç",
         "org_title": "📁 Akıllı Masaüstü ve Klasör Düzenleyici",
         "org_desktop": "🖥️ Masaüstünü Düzenle",
         "org_downloads": "📥 İndirilenler Klasörünü Düzenle",
+        "org_undo": "↩️ Geri Al (Son Düzenleme)",
+        "org_undo_title": "Düzenlemeyi Geri Al",
+        "org_undo_confirm": "Son düzenleme işlemi geri alınacak; {count} dosya eski konumuna taşınacak. Devam edilsin mi?",
+        "org_undo_progress": "Geri alınıyor...",
+        "org_undo_done": "✅ Geri alma tamamlandı: {count} dosya eski konumuna döndürüldü.",
+        "org_undo_fail": "⚠️ {count} dosya geri taşınamadı (hedefte çakışma veya erişim hatası).",
         "startup_title": "🚀 Windows Başlangıç Uygulamaları",
         "hash_btn": "🔍 Hash Hesaplanacak Dosyayı Seç",
+        "check_update": "🔄 Güncellemeleri Kontrol Et",
+        "update_checking": "Kontrol ediliyor...",
+        "update_latest": "✅ Güncel sürümü kullanıyorsunuz (v{version}).",
+        "update_error": "Güncelleme kontrolü başarısız: {err}",
+        "update_repo_missing": "GitHub depo adresi yapılandırılmamış (koddaki GITHUB_REPO sabitini doldurun).",
+        "update_available_title": "🎉 Yeni Sürüm Kullanılabilir: v{version}",
+        "update_download_btn": "⬇️ Kurulum Dosyasını İndir",
+        "update_downloading": "İndiriliyor: %{pct}",
+        "update_downloaded": "✅ İndirildi: {path}",
+        "update_no_asset": "Bu sürümde indirilebilir kurulum dosyası (.exe) bulunamadı.",
+        "update_close_btn": "Daha Sonra",
         "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Güncelleme Raporu",
         "update_notes": (
-            "📌 SÜRÜM GELİŞİM GEÇMİŞİ (v1.0 ➔ v4.0.1)\n"
+            "📌 SÜRÜM GELİŞİM GEÇMİŞİ (v1.0 ➔ v4.0.2)\n"
             "══════════════════════════════════════════════════════════\n\n"
-            "✨ v4.0.1 (Güncel Sürüm — 18 Ekim 2026):\n"
+            "✨ v4.0.2 (Güncel Sürüm — 24 Ekim 2026):\n"
+            "• 👥 ÇİFT DOSYA TOPLU İŞLEM: Tarama sonrası en eski dosya orijinal olarak korunur; tüm kopyalar tek tıkla seçilip Geri Dönüşüm Kutusu'na gönderilebilir veya kalıcı silinebilir.\n"
+            "• ↩️ DÜZENLEYİCİ GERİ AL: Akıllı Düzenleyici son taşıma işlemini oturum boyunca bellekte tutar ve tek tıkla tüm dosyaları eski konumlarına döndürür.\n"
+            "• 💾 KALICI AYARLAR: Dil (TR/EN), görünüm modu (Dark/Light) ve renk teması config.json dosyasına kaydedilir; uygulama açılışında otomatik geri yüklenir.\n"
+            "• 🔄 OTOMATİK GÜNCELLEME: GitHub Releases API ile yeni sürüm kontrolü ve kurulum dosyasını tek tıkla indirme desteği.\n\n"
+            "✨ v4.0.1 (18 Ekim 2026):\n"
             "• 🧹 SİSTEM TEMİZLEYİCİ: Windows Temp ve AppData Temp klasörlerinin aynı dizini işaret ettiği durumlarda oluşan çift sayım hatası tamamen giderildi.\n"
             "• 📁 AKILLI DÜZENLEYİCİ: Masaüstü ve İndirilenler düzenleyicisine onay penceresi eklendi, işlem arka plan iş parçacığına taşındı ve aynı isimli dosyaların üzerine yazılması engellendi.\n"
             "• 📦 ARŞİVLEME: Arşiv dosyaları artık doğrudan kaynak dosyanın bulunduğu klasörün yanına kaydediliyor.\n"
             "• ⚡ PERFORMANS: Çift Dosya Bulucu boyuta göre ön-gruplama ile hızlandırıldı; Canlı Kaynak İzleyici sekme değiştiğinde otomatik duraklatılarak CPU tasarrufu sağlandı.\n"
-            "• 🌐 ÇEVİRİ: Üst araç çubuğu, tüm alt paneller ve Telefonla Aktar modülü için eksiksiz TR/EN dil desteği tamamlandı.\n"
+            "• 🌐 ÇEVİRİ: Üst araç çubuğu ve Telefonla Aktar için TR/EN desteği; bazı paneller ve mesajlar Türkçe kalır.\n"
             "• 🧱 DAĞITIM: Nuitka yerel C derlemesi ve Inno Setup kurulum sihirbazı paketi hazırlandı.\n\n"
             "✨ v4.0 (LAN Transfer & Android Desteği):\n"
             "• 📱 TELEFONLA AKTAR: İnternete veya buluta ihtiyaç duymadan, aynı yerel ağdaki Android telefona doğrudan dosya aktarımı.\n"
@@ -458,12 +499,12 @@ LANGUAGES = {
             "• 🛠️ THREAD-SAFE UI QUEUE: Arka plan işlerinin arayüzü kilitlemesini ve çökmesini engelleyen kuyruk mimarisi.\n\n"
             "✨ v3.5 (Görsel Yenilikler & Özel Temalar):\n"
             "• 🖼️ LOGO & İKON: Yeni uygulama logosu ve Windows görev çubuğu / pencere ikonu entegrasyonu.\n"
-            "• 🎨 11 RENK TEMASI: Catppuccin, Emerald, Cyberpunk, Nordic, Dracula, Sunset dahil 11 özel renk paleti ve Koyu/Açık mod uyumu.\n"
+            "• 🎨 11 RENK TEMASI: Catppuccin, Emerald, Cyberpunk, Nordic, Sunset dahil 11 özel renk paleti ve Koyu/Açık mod uyumu.\n"
             "• 🔐 GİZLİ KASA (.beyt): Hassas dosyaları şifreleyerek tek bir güvenli .beyt kasasında saklama desteği.\n"
             "• ⚡ BELLEK AZALTICI: Uygulama çalışma kümesini tek tıkla boşaltma (EmptyWorkingSet).\n"
             "• 🔄 GÜNCELLEYİCİ: Windows Package Manager (winget) entegrasyonuyla eski yazılımları tarama.\n\n"
             "✨ v3.0 (Performans & Gelişmiş Araçlar):\n"
-            "• 👥 ÇİFT DOSYA BULUCU: MD5 ve SHA-256 imzalarıyla yinelenen dosyaları tespit etme.\n"
+            "• 👥 ÇİFT DOSYA BULUCU: SHA-256 imzalarıyla yinelenen dosyaları tespit etme.\n"
             "• 📊 DİSK ANALİZİ: Seçilen klasördeki en büyük 50 dosyayı boyutuna göre listeleme.\n"
             "• 🚀 BAŞLANGIÇ YÖNETİCİSİ: Windows başlangıcında otomatik çalışan uygulamaları görüntüleme.\n\n"
             "✨ v2.5 & v2.0 (Güvenlik & Çoklu Format):\n"
@@ -503,23 +544,57 @@ LANGUAGES = {
         "updater_btn": "🔍 Scan Outdated Software (winget)",
         "analyzer_btn": "📁 Select Folder/Drive to Scan",
         "dup_btn": "🔍 Select Folder and Scan Duplicates",
+        "dup_select_copies": "🎯 Select Copies (Keep Original)",
+        "dup_recycle": "🗑️ Send to Recycle Bin",
+        "dup_perm": "🔥 Delete Permanently",
+        "dup_delete_title": "Duplicate Deletion Confirmation",
+        "dup_confirm_recycle": "{count} selected duplicate file(s) will be sent to the Recycle Bin. Continue?",
+        "dup_confirm_perm": "{count} selected duplicate file(s) will be PERMANENTLY deleted (irreversible). Continue?",
+        "dup_no_selection": "Select duplicate files to delete first (or use the 'Select Copies' button).",
+        "dup_deleted": "✅ {count} file(s) deleted.",
+        "dup_delete_fail": "⚠️ {count} file(s) could not be deleted.",
+        "dup_summary": "Scan Complete: {groups} group(s), {copies} deletable duplicate(s) found!",
+        "dup_selected": "🎯 {count} duplicate(s) selected (originals kept).",
+        "dup_original_tag": "  ⭐ (original)",
         "shred_title": "🔥 Overwrite and Delete File",
         "shred_btn": "🔥 Select File to Permanently Shred",
         "org_title": "📁 Smart Desktop and Folder Organizer",
         "org_desktop": "🖥️ Organize Desktop",
         "org_downloads": "📥 Organize Downloads",
+        "org_undo": "↩️ Undo (Last Organize)",
+        "org_undo_title": "Undo Organize",
+        "org_undo_confirm": "The last organize operation will be undone; {count} file(s) will be moved back to their original locations. Continue?",
+        "org_undo_progress": "Undoing...",
+        "org_undo_done": "✅ Undo complete: {count} file(s) restored to their original locations.",
+        "org_undo_fail": "⚠️ {count} file(s) could not be moved back (target conflict or access error).",
         "startup_title": "🚀 Windows Startup Applications",
         "hash_btn": "🔍 Select File to Calculate Hash",
+        "check_update": "🔄 Check for Updates",
+        "update_checking": "Checking...",
+        "update_latest": "✅ You are on the latest version (v{version}).",
+        "update_error": "Update check failed: {err}",
+        "update_repo_missing": "GitHub repository is not configured (fill in the GITHUB_REPO constant in the code).",
+        "update_available_title": "🎉 New Version Available: v{version}",
+        "update_download_btn": "⬇️ Download Installer",
+        "update_downloading": "Downloading: {pct}%",
+        "update_downloaded": "✅ Downloaded: {path}",
+        "update_no_asset": "No downloadable installer (.exe) found for this release.",
+        "update_close_btn": "Later",
         "update_title": f"🚀 Beytarchiver v{CURRENT_VERSION} Pro Changelog",
         "update_notes": (
-            "📌 VERSION CHANGELOG (v1.0 ➔ v4.0.1)\n"
+            "📌 VERSION CHANGELOG (v1.0 ➔ v4.0.2)\n"
             "══════════════════════════════════════════════════════════\n\n"
-            "✨ v4.0.1 (Current Release — October 18, 2026):\n"
+            "✨ v4.0.2 (Current Release — October 24, 2026):\n"
+            "• 👥 DUPLICATE BULK ACTIONS: After a scan, the oldest file is kept as the original; all copies can be selected with one click and sent to the Recycle Bin or deleted permanently.\n"
+            "• ↩️ ORGANIZER UNDO: The Smart Organizer keeps the last move operation in memory for the current session and restores every file to its original location with one click.\n"
+            "• 💾 PERSISTENT SETTINGS: Language (TR/EN), appearance mode (Dark/Light), and color theme are saved to config.json and restored automatically on startup.\n"
+            "• 🔄 AUTO UPDATE CHECK: New-version detection via the GitHub Releases API with one-click installer download.\n\n"
+            "✨ v4.0.1 (October 18, 2026):\n"
             "• 🧹 SYSTEM CLEANER: Fixed duplicate counting between Windows Temp and AppData Temp when paths overlap.\n"
             "• 📁 SMART ORGANIZER: Added confirmation prompt, background worker thread, and safe duplicate renaming ( (1), (2)).\n"
             "• 📦 ARCHIVING: Archives now output directly next to the source folder.\n"
             "• ⚡ PERFORMANCE: Size-grouped duplicate scanner for faster scans; tab-scoped Resource Monitor pauses in background.\n"
-            "• 🌐 LOCALIZATION: Full Turkish & English bilingual translation across toolbar, panels, and Phone Transfer.\n"
+            "• 🌐 LOCALIZATION: Turkish & English support for toolbar and Phone Transfer; some panels and messages remain Turkish.\n"
             "• 🧱 DISTRIBUTION: Native C compilation via Nuitka and one-click Inno Setup installer package.\n\n"
             "✨ v4.0 (LAN Transfer & Android Client):\n"
             "• 📱 PHONE TRANSFER: Direct PC-to-Android file transfer over local network without cloud servers or accounts.\n"
@@ -533,12 +608,12 @@ LANGUAGES = {
             "• 🛠️ THREAD-SAFE UI QUEUE: Eliminates Tkinter race conditions and freezes during intensive scans.\n\n"
             "✨ v3.5 (Visuals & Custom Themes):\n"
             "• 🖼️ LOGO & ICONS: In-app brand logo and Windows taskbar / title bar icon integration.\n"
-            "• 🎨 11 COLOR THEMES: Catppuccin, Emerald, Cyberpunk, Nordic, Dracula, Sunset palettes with Dark/Light modes.\n"
+            "• 🎨 11 COLOR THEMES: Catppuccin, Emerald, Cyberpunk, Nordic, Sunset palettes with Dark/Light modes.\n"
             "• 🔐 ENCRYPTED VAULT (.beyt): AES-256 encrypted multi-file container creation and extraction.\n"
             "• ⚡ MEMORY TRIMMER: Working set reduction (EmptyWorkingSet) with single click.\n"
             "• 🔄 SOFTWARE UPDATER: Integrated winget engine for outdated software scans.\n\n"
             "✨ v3.0 (Performance & Advanced Utilities):\n"
-            "• 👥 DUPLICATE FINDER: MD5 and SHA-256 duplicate file detector.\n"
+            "• 👥 DUPLICATE FINDER: SHA-256 duplicate file detector.\n"
             "• 📊 DISK ANALYZER: Identifies top 50 largest files in any folder or drive.\n"
             "• 🚀 STARTUP MANAGER: Lists Windows startup registry entries.\n\n"
             "✨ v2.5 & v2.0 (Multi-Format & Security Engines):\n"
@@ -565,7 +640,7 @@ class BeytNativeAntivirus:
         sha256 = hashlib.sha256()
         try:
             with open(file_path, "rb") as f:
-                for chunk in iter(lambda: f.read(8192), b""):
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
                     sha256.update(chunk)
             return sha256.hexdigest()
         except Exception:
@@ -605,11 +680,17 @@ class BeytarchiverApp(TkinterDnD.Tk):
             except Exception:
                 pass
 
-        ctk.set_appearance_mode("dark")
+        # --- Kalıcı Ayarları Yükle (config.json) ---
+        self.config_data = load_config()
+        saved_lang = self.config_data.get("language")
+        self.current_lang = saved_lang if saved_lang in LANGUAGES else "TR"
+        saved_palette = self.config_data.get("palette")
+        self.active_palette_name = saved_palette if saved_palette in COLOR_THEMES else "Catppuccin (Varsayılan)"
+        saved_mode = str(self.config_data.get("appearance_mode", "dark")).lower()
+        self.appearance_mode = saved_mode if saved_mode in ("dark", "light", "system") else "dark"
+        ctk.set_appearance_mode(self.appearance_mode)
         ctk.set_default_color_theme("blue")
 
-        self.current_lang = "TR"
-        self.active_palette_name = "Catppuccin (Varsayılan)"
         self.av_engine = BeytNativeAntivirus()
 
         # Thread-Safe UI Queue (Parametre çökmelerini kesin engelleyen yapı)
@@ -620,6 +701,7 @@ class BeytarchiverApp(TkinterDnD.Tk):
         self._reveal_after = None
         self._password_sites = {}
         self.monitor_running = False
+        self._downloading_update = False
         self.protocol('WM_DELETE_WINDOW', self.close_app)
         self.process_ui_queue()
 
@@ -632,6 +714,9 @@ class BeytarchiverApp(TkinterDnD.Tk):
         self._compressing = False
         self._cleaning = False
         self._organizing = False
+        self._undo_moves = []
+        self.dup_groups = []
+        self.dup_item_paths = {}
 
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -657,7 +742,8 @@ class BeytarchiverApp(TkinterDnD.Tk):
 
         self.show_view("compress")
         self.after(500, self.check_first_launch_update)
-        
+        self.after(3000, lambda: self.check_for_updates(silent=True) if self.config_data.get("auto_update_check", False) else None)
+
         # Başlangıçta temayı uygula
         self.apply_color_palette(self.active_palette_name)
 
@@ -690,6 +776,7 @@ class BeytarchiverApp(TkinterDnD.Tk):
 
     def close_app(self):
         self._closing = True
+        self.persist_settings()
         self.transfer_panel.shutdown()
         self.monitor_running = False
         self.lock_passwords()
@@ -699,6 +786,14 @@ class BeytarchiverApp(TkinterDnD.Tk):
 
     def t(self, key):
         return LANGUAGES.get(self.current_lang, {}).get(key, key)
+
+    def persist_settings(self):
+        self.config_data.update({
+            "language": self.current_lang,
+            "appearance_mode": self.appearance_mode,
+            "palette": self.active_palette_name,
+        })
+        save_config(self.config_data)
 
     def apply_color_palette(self, palette_name=None):
         if palette_name: self.active_palette_name = palette_name
@@ -716,9 +811,11 @@ class BeytarchiverApp(TkinterDnD.Tk):
         self.toolbar.configure(fg_color=theme_colors["card"])
         self.view_bar.configure(fg_color=theme_colors["bg"])
         self.status_bar.configure(fg_color=theme_colors["bg"])
+        self.persist_settings()
 
     def change_appearance_mode(self, new_mode):
-        ctk.set_appearance_mode(new_mode.lower())
+        self.appearance_mode = new_mode.lower()
+        ctk.set_appearance_mode(self.appearance_mode)
         self.apply_color_palette()
 
     def check_first_launch_update(self):
@@ -755,12 +852,115 @@ class BeytarchiverApp(TkinterDnD.Tk):
                 pass
             dialog.destroy()
 
+        dialog.protocol("WM_DELETE_WINDOW", close_and_save)
         btn_ok = ctk.CTkButton(dialog, text=self.t("btn_close_update"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(size=14, weight="bold"), height=38, command=close_and_save)
         btn_ok.pack(pady=(5, 20))
+
+    # ==========================================
+    # 🔄 OTOMATİK GÜNCELLEME KONTROLÜ (GitHub Releases)
+    # ==========================================
+    def check_for_updates(self, silent=False):
+        if self._downloading_update:
+            return
+        if not silent:
+            self.lbl_update_status.configure(text=self.t("update_checking"), text_color="#89B4FA")
+        threading.Thread(target=self.update_check_engine, args=(silent,), daemon=True).start()
+
+    def update_check_engine(self, silent):
+        if not GITHUB_REPO or "/" not in GITHUB_REPO:
+            if not silent:
+                self.safe_ui_update(self.lbl_update_status.configure,
+                                    text=self.t("update_repo_missing"), text_color="#F38BA8")
+            return
+        try:
+            request = urllib.request.Request(
+                f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
+                headers={"User-Agent": f"Beytarchiver/{CURRENT_VERSION}",
+                         "Accept": "application/vnd.github+json"})
+            with urllib.request.urlopen(request, timeout=15) as response:
+                release = json.loads(response.read().decode("utf-8"))
+            tag = str(release.get("tag_name", "")).lstrip("vV")
+            if parse_version(tag) > parse_version(CURRENT_VERSION):
+                asset_url, asset_name, asset_digest = "", "", ""
+                for asset in release.get("assets", []):
+                    name = str(asset.get("name", ""))
+                    if name.lower().endswith(".exe"):
+                        asset_url = str(asset.get("browser_download_url", ""))
+                        asset_name = name
+                        asset_digest = asset.get("digest", "")
+                        break
+                self.safe_ui_update(self.show_update_available_dialog, tag,
+                                    str(release.get("body", ""))[:4000], asset_url, asset_name, asset_digest)
+            elif not silent:
+                self.safe_ui_update(self.lbl_update_status.configure,
+                                    text=self.t("update_latest").format(version=CURRENT_VERSION),
+                                    text_color="#A6E3A1")
+        except Exception as exc:
+            if not silent:
+                self.safe_ui_update(self.lbl_update_status.configure,
+                                    text=self.t("update_error").format(err=exc), text_color="#F38BA8")
+
+    def show_update_available_dialog(self, tag, body, asset_url, asset_name, asset_digest):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(self.t("update_available_title").format(version=tag))
+        dialog.geometry("640x480")
+        dialog.transient(self)
+        dialog.grab_set()
+
+        ctk.CTkLabel(dialog, text=self.t("update_available_title").format(version=tag),
+                     font=ctk.CTkFont(size=18, weight="bold"), text_color="#A6E3A1").pack(pady=(20, 5))
+
+        txt_box = ctk.CTkTextbox(dialog, corner_radius=10, font=ctk.CTkFont(size=13))
+        txt_box.pack(pady=10, padx=20, fill="both", expand=True)
+        txt_box.insert("end", body or "—")
+        txt_box.configure(state="disabled")
+
+        def start_download():
+            dialog.destroy()
+            self.download_update_asset(asset_url, asset_name or f"beytarchiver_v{tag}_setup.exe", asset_digest)
+
+        if asset_url:
+            ctk.CTkButton(dialog, text=self.t("update_download_btn"), fg_color="#A6E3A1",
+                          text_color="#11111B", font=ctk.CTkFont(size=14, weight="bold"),
+                          height=38, command=start_download).pack(pady=(5, 5))
+        else:
+            ctk.CTkLabel(dialog, text=self.t("update_no_asset"),
+                         font=ctk.CTkFont(size=12), text_color="#F9E2AF").pack(pady=(5, 0))
+        ctk.CTkButton(dialog, text=self.t("update_close_btn"), fg_color="#313244",
+                      height=32, command=dialog.destroy).pack(pady=(0, 15))
+
+    def download_update_asset(self, url, filename, digest=""):
+        if self._downloading_update:
+            return
+        safe_name = "".join(ch for ch in ntpath.basename(filename)
+                            if ch.isalnum() or ch in "._- ") or "beytarchiver_update.exe"
+        self._downloading_update = True
+        self.lbl_update_status.configure(text=self.t("update_downloading").format(pct=0),
+                                         text_color="#89B4FA")
+        threading.Thread(target=self.download_update_engine, args=(url, safe_name, digest), daemon=True).start()
+
+    def download_update_engine(self, url, filename, digest=""):
+        try:
+            dest = Path.home() / "Downloads" / filename
+            download_verified(url, dest, digest)
+            self.safe_ui_update(self.finish_update_download, dest)
+        except Exception as exc:
+            self.safe_ui_update(self.lbl_update_status.configure,
+                                text=self.t("update_error").format(err=exc), text_color="#F38BA8")
+        finally:
+            self._downloading_update = False
+
+    def finish_update_download(self, dest):
+        self.lbl_update_status.configure(text=self.t("update_downloaded").format(path=dest),
+                                         text_color="#A6E3A1")
+        beep(1200, 300)
+        send_notification("Beytarchiver", self.t("update_downloaded").format(path=dest.name))
+        open_in_explorer(dest)
 
     def change_language(self, new_lang):
         self.current_lang = new_lang
         self.update_ui_language()
+        self.persist_settings()
 
     def update_ui_language(self):
         for key, btn in self.nav_btns.items(): btn.configure(text=self.t(key))
@@ -786,17 +986,22 @@ class BeytarchiverApp(TkinterDnD.Tk):
         self.btn_scan_updater.configure(text=self.t("updater_btn"))
         self.btn_select_ana_dir.configure(text=self.t("analyzer_btn"))
         self.btn_scan_dup.configure(text=self.t("dup_btn"))
+        self.btn_dup_select.configure(text=self.t("dup_select_copies"))
+        self.btn_dup_recycle.configure(text=self.t("dup_recycle"))
+        self.btn_dup_perm.configure(text=self.t("dup_perm"))
         self.lbl_shred_title.configure(text=self.t("shred_title"))
         self.btn_shred_select.configure(text=self.t("shred_btn"))
         self.lbl_org_title.configure(text=self.t("org_title"))
         self.btn_org_desktop.configure(text=self.t("org_desktop"))
         self.btn_org_downloads.configure(text=self.t("org_downloads"))
+        self.btn_org_undo.configure(text=self.t("org_undo"))
         self.lbl_startup_title.configure(text=self.t("startup_title"))
         self.btn_select_hash.configure(text=self.t("hash_btn"))
         self.lbl_settings_header.configure(text="⚙️ " + self.t("settings"))
         self.lbl_theme_title.configure(text=self.t("theme"))
         self.lbl_palette_title.configure(text=self.t("color_palette"))
         self.lbl_lang_title.configure(text=self.t("language"))
+        self.btn_check_update.configure(text=self.t("check_update"))
         if hasattr(self, "transfer_panel") and hasattr(self.transfer_panel, "set_language"):
             self.transfer_panel.set_language(self.current_lang)
 
@@ -925,9 +1130,11 @@ class BeytarchiverApp(TkinterDnD.Tk):
     def start_monitor_loop(self):
         if getattr(self, "monitor_running", False): return
         self.monitor_running = True
+        self._monitor_generation = getattr(self, "_monitor_generation", 0) + 1
+        generation = self._monitor_generation
         
         def update_stats():
-            while self.monitor_running:
+            while self.monitor_running and generation == self._monitor_generation:
                 try:
                     cpu = psutil.cpu_percent()
                     ram = psutil.virtual_memory().percent
@@ -1087,9 +1294,8 @@ class BeytarchiverApp(TkinterDnD.Tk):
         selected = self.pass_tree.selection()
         if selected:
             site = self._password_sites[selected[0]]
-            if getattr(self, "_closing", True) is False and hasattr(self, "tk"):
-                if not messagebox.askyesno("Şifre Silme Onayı", f"'{site}' kaydı kalıcı olarak silinsin mi?", default="no", parent=self):
-                    return
+            if not messagebox.askyesno("Şifre Silme Onayı", f"'{site}' kaydı kalıcı olarak silinsin mi?", default="no", parent=self):
+                return
             data = dict(self.password_vault.data)
             data.pop(site, None)
             try:
@@ -1166,10 +1372,15 @@ class BeytarchiverApp(TkinterDnD.Tk):
 
     def compress_engine(self, files, fmt, pwd):
         self.safe_ui_update(self.lbl_status.configure, text="Sıkıştırılıyor...", text_color="#89B4FA")
+        partial = None
         try:
             first_parent = Path(files[0]).resolve().parent if files else Path.cwd()
             target_dir = first_parent if first_parent.is_dir() and os.access(first_parent, os.W_OK) else Path.cwd()
             out_name = str(target_dir / f"beyt_archive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{fmt}")
+            final_name = unused_path(out_name)
+            fd, partial = tempfile.mkstemp(prefix=final_name.name + ".", suffix=".part", dir=target_dir)
+            os.close(fd)
+            out_name = partial
             used_names = set()
             all_entries = []
             
@@ -1200,12 +1411,16 @@ class BeytarchiverApp(TkinterDnD.Tk):
             else:
                 raise ValueError('Desteklenmeyen sıkıştırma biçimi.')
 
+            os.link(partial, final_name)
+            out_name = str(final_name)
             self.safe_ui_update(self.lbl_status.configure, text=f"Sıkıştırma Başarılı: {out_name}", text_color="#A6E3A1")
             beep(1000, 300)
             send_notification("Beytarchiver", "Arşiv başarıyla oluşturuldu!")
         except Exception as e:
             self.safe_ui_update(self.lbl_status.configure, text=f"Hata: {e}", text_color="#F38BA8")
         finally:
+            if partial is not None:
+                Path(partial).unlink(missing_ok=True)
             self.safe_ui_update(self.finish_compression)
 
     def finish_compression(self):
@@ -1251,7 +1466,7 @@ class BeytarchiverApp(TkinterDnD.Tk):
     def extract_engine(self, archive, pwd):
         self.safe_ui_update(self.lbl_status.configure, text="Dosyalar Çıkartılıyor...", text_color="#89B4FA")
         try:
-            out_dir = os.path.splitext(archive)[0] + "_extracted"
+            out_dir = str(unused_path(os.path.splitext(archive)[0] + "_extracted"))
             safe_extract_archive(archive, out_dir, pwd)
                     
             self.safe_ui_update(self.lbl_status.configure, text="Çıkartma Başarılı!", text_color="#A6E3A1")
@@ -1291,19 +1506,29 @@ class BeytarchiverApp(TkinterDnD.Tk):
         if files: threading.Thread(target=self.vault_engine, args=(files, pwd), daemon=True).start()
 
     def vault_engine(self, files, pwd):
+        partial = None
         try:
             first_parent = Path(files[0]).resolve().parent if files else Path.cwd()
             target_dir = first_parent if first_parent.is_dir() and os.access(first_parent, os.W_OK) else Path.cwd()
             out_name = str(target_dir / f"secure_vault_{datetime.now().strftime('%Y%m%d_%H%M%S')}.beyt")
+            final_name = unused_path(out_name)
+            fd, partial = tempfile.mkstemp(prefix=final_name.name + ".", suffix=".part", dir=target_dir)
+            os.close(fd)
+            out_name = partial
             used_names = set()
             with pyzipper.AESZipFile(out_name, "w", compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES) as zf:
                 zf.setpassword(pwd.encode())
                 for f in files:
                     zf.write(f, unique_arcname(os.path.basename(f), used_names))
+            os.link(partial, final_name)
+            out_name = str(final_name)
             self.safe_ui_update(self.lbl_vault_status.configure, text=f"✅ Kasa Oluşturuldu: {out_name}", text_color="#A6E3A1")
             beep(1000, 300)
         except Exception as e:
             self.safe_ui_update(self.lbl_vault_status.configure, text=f"Hata: {e}", text_color="#F38BA8")
+        finally:
+            if partial is not None:
+                Path(partial).unlink(missing_ok=True)
 
     def build_ram_view(self):
         self.ram_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
@@ -1322,7 +1547,14 @@ class BeytarchiverApp(TkinterDnD.Tk):
     def clean_ram(self):
         if sys.platform == "win32":
             try:
-                ctypes.windll.psapi.EmptyWorkingSet(-1)
+                kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+                psapi = ctypes.WinDLL("psapi", use_last_error=True)
+                kernel.GetCurrentProcess.restype = ctypes.c_void_p
+                kernel.GetCurrentProcess.argtypes = []
+                psapi.EmptyWorkingSet.argtypes = [ctypes.c_void_p]
+                psapi.EmptyWorkingSet.restype = ctypes.c_int
+                if not psapi.EmptyWorkingSet(kernel.GetCurrentProcess()):
+                    raise ctypes.WinError(ctypes.get_last_error())
                 self.safe_ui_update(self.lbl_ram_status.configure, text=self.t("ram_done"), text_color="#A6E3A1")
                 beep(1200, 200)
             except Exception as e:
@@ -1517,6 +1749,8 @@ class BeytarchiverApp(TkinterDnD.Tk):
         for fp, _ in files:
             try:
                 os.remove(fp)
+            except FileNotFoundError:
+                pass
             except OSError:
                 failures += 1
         if recycle and sys.platform == 'win32':
@@ -1582,13 +1816,26 @@ class BeytarchiverApp(TkinterDnD.Tk):
         self.btn_scan_dup.pack(side="left", padx=10, pady=10)
         self.lbl_dup_status = ctk.CTkLabel(top, text="Klasör Seçilmedi", font=ctk.CTkFont(size=12))
         self.lbl_dup_status.pack(side="left", padx=10)
-        
+
+        actions = ctk.CTkFrame(self.duplicates_panel, corner_radius=10)
+        actions.pack(fill="x", pady=(0, 8))
+        self.btn_dup_select = ctk.CTkButton(actions, text=self.t("dup_select_copies"), fg_color="#89B4FA", text_color="#11111B", font=ctk.CTkFont(size=12, weight="bold"), command=self.select_dup_copies)
+        self.btn_dup_select.pack(side="left", padx=10, pady=8)
+        self.btn_dup_recycle = ctk.CTkButton(actions, text=self.t("dup_recycle"), fg_color="#F9E2AF", text_color="#11111B", font=ctk.CTkFont(size=12, weight="bold"), command=lambda: self.delete_selected_duplicates(permanent=False))
+        self.btn_dup_recycle.pack(side="left", padx=5, pady=8)
+        self.btn_dup_perm = ctk.CTkButton(actions, text=self.t("dup_perm"), fg_color="#F38BA8", text_color="#11111B", font=ctk.CTkFont(size=12, weight="bold"), command=lambda: self.delete_selected_duplicates(permanent=True))
+        self.btn_dup_perm.pack(side="left", padx=5, pady=8)
+
         tree_frame = ctk.CTkFrame(self.duplicates_panel, corner_radius=10, fg_color="#181825")
         tree_frame.pack(fill="both", expand=True)
         columns = ("hash", "name", "size", "path")
-        self.dup_tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
+        self.dup_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", selectmode="extended")
         self.dup_tree.heading("hash", text="Hash İmzası"); self.dup_tree.heading("name", text="Dosya Adı"); self.dup_tree.heading("size", text="Boyut"); self.dup_tree.heading("path", text="Konumu")
         self.dup_tree.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+
+        dup_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.dup_tree.yview)
+        self.dup_tree.configure(yscroll=dup_scrollbar.set)
+        dup_scrollbar.pack(side="right", fill="y")
 
     def start_dup_scan(self):
         target = filedialog.askdirectory()
@@ -1596,8 +1843,30 @@ class BeytarchiverApp(TkinterDnD.Tk):
             self.lbl_dup_status.configure(text=f"Taranıyor: {target}", text_color="#89B4FA")
             threading.Thread(target=self.dup_scan_engine, args=(target,), daemon=True).start()
 
+    def reset_dup_tree(self):
+        self.clear_tree(self.dup_tree)
+        self.dup_item_paths.clear()
+        self.dup_groups = []
+
+    def populate_dup_tree(self, groups):
+        self.dup_groups = groups
+        copies = 0
+        for _hash, fsize, file_list in groups:
+            sz = format_size(fsize)
+            for idx, fp in enumerate(file_list):
+                is_original = idx == 0
+                name = os.path.basename(fp) + (self.t("dup_original_tag") if is_original else "")
+                iid = self.dup_tree.insert("", "end", values=(_hash[:16] + "...", name, sz, fp))
+                self.dup_item_paths[iid] = fp
+                if not is_original:
+                    copies += 1
+        self.lbl_dup_status.configure(
+            text=self.t("dup_summary").format(groups=len(groups), copies=copies),
+            text_color="#A6E3A1")
+        beep(1000, 200)
+
     def dup_scan_engine(self, target):
-        self.safe_ui_update(self.clear_tree, self.dup_tree)
+        self.safe_ui_update(self.reset_dup_tree)
         by_size = {}
         for root, _, dir_files in os.walk(target):
             for f in dir_files:
@@ -1606,7 +1875,8 @@ class BeytarchiverApp(TkinterDnD.Tk):
                     if os.path.islink(fp):
                         continue
                     fsize = os.path.getsize(fp)
-                    by_size.setdefault(fsize, []).append(fp)
+                    if fsize > 0:
+                        by_size.setdefault(fsize, []).append(fp)
                 except Exception:
                     pass
 
@@ -1621,17 +1891,82 @@ class BeytarchiverApp(TkinterDnD.Tk):
                         hashes.setdefault((fsize, h), []).append(fp)
                 except Exception:
                     pass
-                
-        count = 0
+
+        groups = []
         for (fsize, h), file_list in hashes.items():
             if len(file_list) > 1:
-                sz = format_size(fsize)
-                for fp in file_list:
-                    count += 1
-                    self.safe_ui_update(self.dup_tree.insert, "", "end", values=(h[:16] + "...", os.path.basename(fp), sz, fp))
-                    
-        self.safe_ui_update(self.lbl_dup_status.configure, text=f"Tarama Bitti: {count} kopya bulundu!", text_color="#A6E3A1")
-        beep(1000, 200)
+                # En eski dosya orijinal kabul edilir ve korunur.
+                try:
+                    file_list.sort(key=os.path.getmtime)
+                except OSError:
+                    pass
+                groups.append((h, fsize, file_list))
+        groups.sort(key=lambda g: g[1], reverse=True)
+        self.safe_ui_update(self.populate_dup_tree, groups)
+
+    def select_dup_copies(self):
+        originals = {group[2][0] for group in self.dup_groups if group[2]}
+        iids = [iid for iid, path in self.dup_item_paths.items() if path not in originals]
+        if not iids:
+            return
+        self.dup_tree.selection_set(iids)
+        self.dup_tree.focus(iids[0])
+        self.lbl_dup_status.configure(
+            text=self.t("dup_selected").format(count=len(iids)), text_color="#89B4FA")
+
+    def delete_selected_duplicates(self, permanent):
+        iids = [iid for iid in self.dup_tree.selection() if iid in self.dup_item_paths]
+        if not iids:
+            messagebox.showinfo(self.t("dup_delete_title"), self.t("dup_no_selection"), parent=self)
+            return
+        paths = [self.dup_item_paths[iid] for iid in iids]
+        if not duplicates_have_survivors(self.dup_groups, paths):
+            messagebox.showwarning(self.t("dup_delete_title"),
+                "Her grupta diskte en az bir dosya kalmalı. / Keep one existing file per group.", parent=self)
+            return
+        confirm_key = "dup_confirm_perm" if permanent else "dup_confirm_recycle"
+        if not messagebox.askyesno(self.t("dup_delete_title"),
+                                   self.t(confirm_key).format(count=len(iids)),
+                                   default="no", parent=self):
+            return
+        paths = [self.dup_item_paths[iid] for iid in iids]
+        self.btn_dup_recycle.configure(state="disabled")
+        self.btn_dup_perm.configure(state="disabled")
+        threading.Thread(target=self.dup_delete_engine, args=(tuple(iids), tuple(paths), permanent), daemon=True).start()
+
+    def dup_delete_engine(self, iids, paths, permanent):
+        deleted, failed = [], 0
+        if not duplicates_have_survivors(self.dup_groups, paths):
+            self.safe_ui_update(self.finish_dup_delete, [], len(paths))
+            return
+        if permanent:
+            for iid, path in zip(iids, paths):
+                try:
+                    os.remove(path)
+                    deleted.append(iid)
+                except OSError:
+                    failed += 1
+        else:
+            try:
+                send_to_recycle_bin(paths)
+                deleted = [iid for iid, path in zip(iids, paths) if not os.path.exists(path)]
+            except OSError:
+                pass
+            failed = len(iids) - len(deleted)
+        self.safe_ui_update(self.finish_dup_delete, deleted, failed)
+
+    def finish_dup_delete(self, deleted, failed):
+        for iid in deleted:
+            self.dup_item_paths.pop(iid, None)
+            if self.dup_tree.exists(iid):
+                self.dup_tree.delete(iid)
+        self.btn_dup_recycle.configure(state="normal")
+        self.btn_dup_perm.configure(state="normal")
+        msg = self.t("dup_deleted").format(count=len(deleted))
+        if failed:
+            msg += "  " + self.t("dup_delete_fail").format(count=failed)
+        self.lbl_dup_status.configure(text=msg, text_color="#A6E3A1" if not failed else "#F38BA8")
+        beep(1200, 200)
 
     def build_shredder_view(self):
         self.shredder_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
@@ -1679,6 +2014,8 @@ class BeytarchiverApp(TkinterDnD.Tk):
         self.btn_org_desktop.pack(pady=15)
         self.btn_org_downloads = ctk.CTkButton(body, text=self.t("org_downloads"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(weight="bold"), command=lambda: self.organize_dir(os.path.expanduser("~/Downloads")))
         self.btn_org_downloads.pack(pady=10)
+        self.btn_org_undo = ctk.CTkButton(body, text=self.t("org_undo"), fg_color="#F9E2AF", text_color="#11111B", font=ctk.CTkFont(weight="bold"), state="disabled", command=self.undo_organize)
+        self.btn_org_undo.pack(pady=10)
         self.lbl_org_status = ctk.CTkLabel(body, text="İşlem Bekleniyor", font=ctk.CTkFont(size=13))
         self.lbl_org_status.pack(pady=15)
 
@@ -1688,11 +2025,10 @@ class BeytarchiverApp(TkinterDnD.Tk):
         if not os.path.exists(target_path):
             self.safe_ui_update(self.lbl_org_status.configure, text=f"Klasör bulunamadı: {target_path}", text_color="#F38BA8")
             return
-        if hasattr(self, "tk"):
-            if not messagebox.askyesno("Klasör Düzenleme Onayı",
-                    f"{target_path}\n\nBu klasördeki dosyalar alt klasörlere (Belgeler, Resimler, Arşivler) taşınacak. Devam edilsin mi?",
-                    default="no", parent=self):
-                return
+        if not messagebox.askyesno("Klasör Düzenleme Onayı",
+                f"{target_path}\n\nBu klasördeki dosyalar alt klasörlere (Belgeler, Resimler, Arşivler) taşınacak. Devam edilsin mi?",
+                default="no", parent=self):
+            return
         self._organizing = True
         self.safe_ui_update(self.lbl_org_status.configure, text="Düzenleniyor...", text_color="#89B4FA")
         threading.Thread(target=self.organize_dir_engine, args=(target_path,), daemon=True).start()
@@ -1700,6 +2036,7 @@ class BeytarchiverApp(TkinterDnD.Tk):
     def organize_dir_engine(self, target_path):
         categories = {"Belgeler": [".pdf", ".docx", ".txt"], "Resimler": [".jpg", ".jpeg", ".png"], "Arşivler": [".zip", ".7z"]}
         moved, skipped = 0, 0
+        moves = []
         try:
             for item in os.listdir(target_path):
                 fp = os.path.join(target_path, item)
@@ -1717,17 +2054,63 @@ class BeytarchiverApp(TkinterDnD.Tk):
                                 n += 1
                             try:
                                 shutil.move(fp, dest)
+                                moves.append((fp, dest))
                                 moved += 1
                             except OSError:
                                 skipped += 1
                             break
             msg = f"✅ Başarılı! {moved} dosya kategorize edildi." + (f" ({skipped} atlandı)" if skipped else "")
-            self.safe_ui_update(self.lbl_org_status.configure, text=msg, text_color="#A6E3A1")
+            self.safe_ui_update(self.finish_organize, moves, msg)
             beep(1000, 200)
         except Exception as e:
-            self.safe_ui_update(self.lbl_org_status.configure, text=f"Hata: {e}", text_color="#F38BA8")
+            self.safe_ui_update(self.finish_organize, moves, f"Hata: {e}", True)
         finally:
             self._organizing = False
+
+    def finish_organize(self, moves, msg, is_error=False):
+        if moves:
+            self._undo_moves = list(moves)
+        self.btn_org_undo.configure(state="normal" if self._undo_moves else "disabled")
+        self.lbl_org_status.configure(text=msg, text_color="#F38BA8" if is_error else "#A6E3A1")
+
+    def undo_organize(self):
+        if self._organizing or not self._undo_moves:
+            return
+        moves = list(self._undo_moves)
+        if not messagebox.askyesno(self.t("org_undo_title"),
+                                   self.t("org_undo_confirm").format(count=len(moves)),
+                                   default="no", parent=self):
+            return
+        self._organizing = True
+        self.btn_org_undo.configure(state="disabled")
+        self.lbl_org_status.configure(text=self.t("org_undo_progress"), text_color="#89B4FA")
+        threading.Thread(target=self.undo_organize_engine, args=(tuple(moves),), daemon=True).start()
+
+    def undo_organize_engine(self, moves):
+        restored, failed = 0, 0
+        try:
+            for src, dest in reversed(moves):
+                try:
+                    if os.path.exists(dest) and not os.path.lexists(src):
+                        os.makedirs(os.path.dirname(src), exist_ok=True)
+                        shutil.move(dest, src)
+                        restored += 1
+                    else:
+                        failed += 1
+                except OSError:
+                    failed += 1
+        finally:
+            self._organizing = False
+        self.safe_ui_update(self.finish_undo_organize, restored, failed)
+
+    def finish_undo_organize(self, restored, failed):
+        self._undo_moves = []
+        self.btn_org_undo.configure(state="disabled")
+        msg = self.t("org_undo_done").format(count=restored)
+        if failed:
+            msg += "  " + self.t("org_undo_fail").format(count=failed)
+        self.lbl_org_status.configure(text=msg, text_color="#A6E3A1" if not failed else "#F9E2AF")
+        beep(1000, 200)
 
     def build_startup_view(self):
         self.startup_panel = ctk.CTkFrame(self.content_frame, fg_color="transparent")
@@ -1780,7 +2163,7 @@ class BeytarchiverApp(TkinterDnD.Tk):
         try:
             md5, sha1, sha256 = hashlib.md5(), hashlib.sha1(), hashlib.sha256()
             with open(file_path, "rb") as f:
-                for chunk in iter(lambda: f.read(8192), b""):
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
                     md5.update(chunk); sha1.update(chunk); sha256.update(chunk)
             res = f"📄 Dosya: {os.path.basename(file_path)}\n\n📌 MD5:\n{md5.hexdigest()}\n\n📌 SHA-1:\n{sha1.hexdigest()}\n\n📌 SHA-256:\n{sha256.hexdigest()}\n"
         except Exception as e:
@@ -1810,7 +2193,7 @@ class BeytarchiverApp(TkinterDnD.Tk):
         self.theme_menu = ctk.CTkOptionMenu(settings_container, values=["Dark", "Light", "System"], command=self.change_appearance_mode, width=200)
         self.theme_menu.pack(pady=5, padx=50)
         # Mevcut modu ayarla
-        current_mode = ctk.get_appearance_mode().capitalize()
+        current_mode = self.appearance_mode.capitalize()
         self.theme_menu.set(current_mode if current_mode in ["Dark", "Light"] else "System")
         
         # Renk Paleti
@@ -1825,7 +2208,21 @@ class BeytarchiverApp(TkinterDnD.Tk):
         self.lbl_lang_title.pack(pady=(20, 5))
         self.lang_menu = ctk.CTkOptionMenu(settings_container, values=["TR", "EN"], command=self.change_language, width=200)
         self.lang_menu.set(self.current_lang)
-        self.lang_menu.pack(pady=(5, 30), padx=50)
+        self.lang_menu.pack(pady=5, padx=50)
+
+        self.auto_update_var = ctk.BooleanVar(value=bool(self.config_data.get("auto_update_check", False)))
+        def save_auto_update():
+            self.config_data["auto_update_check"] = self.auto_update_var.get()
+            self.persist_settings()
+        ctk.CTkCheckBox(settings_container,
+            text="Açılışta güncellemeleri kontrol et / Check updates on startup",
+            variable=self.auto_update_var, command=save_auto_update).pack(pady=10)
+
+        # Uygulama Güncellemesi (GitHub Releases)
+        self.btn_check_update = ctk.CTkButton(settings_container, text=self.t("check_update"), fg_color="#A6E3A1", text_color="#11111B", font=ctk.CTkFont(size=13, weight="bold"), command=lambda: self.check_for_updates(silent=False))
+        self.btn_check_update.pack(pady=(20, 5), padx=50)
+        self.lbl_update_status = ctk.CTkLabel(settings_container, text="", font=ctk.CTkFont(size=12), wraplength=340, justify="center")
+        self.lbl_update_status.pack(pady=(0, 25), padx=20)
 
 if __name__ == "__main__":
     app = BeytarchiverApp()

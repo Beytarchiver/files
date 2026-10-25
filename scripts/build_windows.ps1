@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
-$RepoRoot = Split-Path -Parent $RepoRoot; Set-Location $RepoRoot
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+Set-Location $RepoRoot
 
 if ($env:OS -ne 'Windows_NT') {
     throw 'Run this build on Windows.'
@@ -27,6 +28,7 @@ Push-Location $AppDir
 try {
     & $Python -m nuitka --mode=module beytarchiver.py `
         --include-package=lan_transfer `
+        --include-module=beyt_core `
         --output-dir="$NuitkaDir" `
         --remove-output --no-pyi-file --assume-yes-for-downloads
     if ($LASTEXITCODE -ne 0) { throw 'Nuitka native C compilation failed.' }

@@ -307,6 +307,7 @@ def test_background_scans_never_read_tree_widgets(tmp_path, method, args, tree):
     target = SimpleNamespace(**{tree: Tree()}, av_engine=app.BeytNativeAntivirus(),
                              lbl_ana_path=Mock(), lbl_dup_status=Mock(),
                              clear_tree=lambda t: None,
+                             reset_dup_tree=lambda: None, populate_dup_tree=lambda groups: None,
                              safe_ui_update=lambda f, *a, **kw: queue.put((f,a,kw)))
     failures = []
     def run():
